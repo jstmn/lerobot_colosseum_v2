@@ -452,3 +452,36 @@ class IsaaclabArenaEnv(HubEnvConfig):
     @property
     def gym_kwargs(self) -> dict:
         return {}
+
+
+@EnvConfig.register_subclass("maniskill")
+@dataclass
+class ManiSkillEnv(EnvConfig):
+    """Configuration for ManiSkill environments.
+
+    The task parameter supports two formats:
+    - Simple: "PickCube-v1"
+    - With description: "PickCube-v1::Pick up the red cube"
+
+    Examples:
+        lerobot-eval --env.type=maniskill --env.task="PickCube-v1"
+        lerobot-eval --env.type=maniskill --env.task="PickCube-v1::Pick up the cube"
+    """
+
+    task: str = "PickCube-v1"  # Can be "TaskName" or "TaskName::description"
+    episode_length: int = 400
+    obs_mode: str = "rgb"
+    control_mode: str = "pd_ee_delta_pose"
+    render_mode: str = "rgb_array"
+    sim_backend: str = "auto"
+    camera_name: str = "base_camera"
+    state_dim: int = 9  # qpos dimension (7 arm joints + 2 gripper joints)
+
+    @property
+    def gym_kwargs(self) -> dict:
+        return {
+            "obs_mode": self.obs_mode,
+            "control_mode": self.control_mode,
+            "render_mode": self.render_mode,
+            "sim_backend": self.sim_backend,
+        }

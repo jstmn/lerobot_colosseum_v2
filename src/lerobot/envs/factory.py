@@ -141,13 +141,29 @@ def make_env(
 
     # If hub_path is set, download and call hub-provided `make_env`
     if hub_path:
-        # _download_hub_file will raise the same RuntimeError if trust_remote_code is False
-        repo_id, file_path, local_file, revision = _download_hub_file(
-            hub_path, trust_remote_code, hub_cache_dir
-        )
+        import os
 
-        # import and surface clear import errors
-        module = _import_hub_module(local_file, repo_id)
+        # Check if hub_path is a local directory path
+        if os.path.isdir(hub_path):
+            # Local path: directly load env.py from the directory
+            if not trust_remote_code:
+                raise RuntimeError(
+                    f"Refusing to execute code from local path '{hub_path}'. "
+                    "If you trust this code, call `make_env(..., trust_remote_code=True)`."
+                )
+            local_file = os.path.join(hub_path, "env.py")
+            if not os.path.exists(local_file):
+                raise FileNotFoundError(f"Could not find env.py in local path: {hub_path}")
+            repo_id = os.path.basename(hub_path)  # Use directory name as module identifier
+            module = _import_hub_module(local_file, repo_id)
+        else:
+            # HuggingFace Hub path: download from hub
+            # _download_hub_file will raise the same RuntimeError if trust_remote_code is False
+            repo_id, file_path, local_file, revision = _download_hub_file(
+                hub_path, trust_remote_code, hub_cache_dir
+            )
+            # import and surface clear import errors
+            module = _import_hub_module(local_file, repo_id)
 
         # call the hub-provided make_env
         env_cfg = None if isinstance(cfg, str) else cfg
@@ -191,6 +207,24 @@ def make_env(
             task=cfg.task,
             n_envs=n_envs,
             gym_kwargs=cfg.gym_kwargs,
+            env_cls=env_cls,
+        )
+    elif "maniskill" in cfg.type:
+        from lerobot.envs.maniskill import create_maniskill_envs
+
+        if cfg.task is None:
+            raise ValueError("ManiSkill requires a task to be specified")
+
+        return create_maniskill_envs(
+            task=cfg.task,
+            n_envs=n_envs,
+            episode_length=cfg.episode_length,
+            obs_mode=cfg.obs_mode,
+            control_mode=cfg.control_mode,
+            render_mode=cfg.render_mode,
+            sim_backend=cfg.sim_backend,
+            camera_name=cfg.camera_name,
+            state_dim=cfg.state_dim,
             env_cls=env_cls,
         )
 
