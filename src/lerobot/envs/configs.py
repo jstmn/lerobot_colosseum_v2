@@ -476,6 +476,8 @@ class ManiSkillEnv(EnvConfig):
     sim_backend: str = "auto"
     camera_name: str = "base_camera"
     state_dim: int = 9  # qpos dimension (7 arm joints + 2 gripper joints)
+    observation_height: int = 480  # Camera image height (must match training data)
+    observation_width: int = 640   # Camera image width (must match training data)
 
     @property
     def gym_kwargs(self) -> dict:

@@ -225,6 +225,8 @@ def make_env(
             sim_backend=cfg.sim_backend,
             camera_name=cfg.camera_name,
             state_dim=cfg.state_dim,
+            observation_height=cfg.observation_height,
+            observation_width=cfg.observation_width,
             env_cls=env_cls,
         )
 

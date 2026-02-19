@@ -20,10 +20,76 @@ This module provides native ManiSkill environment support for LeRobot evaluation
 
 import gymnasium as gym
 import numpy as np
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, Optional
 
 # Import ManiSkill to register environments
 import mani_skill.envs
+
+
+# =============================================================================
+# Task Mappings (must match training data exactly!)
+# =============================================================================
+
+# Single Arm Tasks (16 tasks) - Colosseum v2 benchmark
+# Format: env_id -> (task_index, language_description)
+SINGLE_ARM_TASK_MAPPING = {
+    "CookItemInPan-v1":         (0,  "Cook the item in the pan"),
+    "HammerNail-v1":            (1,  "Hammer the nail into the surface"),
+    "LiftPegUpright-v1":        (2,  "Lift the peg upright"),
+    "OpenCabinet-v1":           (3,  "Open the cabinet door"),
+    "OpenDrawer-v1":            (4,  "Open the drawer"),
+    "PegInsertionSide-v2":      (5,  "Insert the peg from the side"),
+    "PickDishFromRack-v1":      (6,  "Pick up the dish from the rack"),
+    "PickSodaFromCabinet-v1":   (7,  "Pick up the soda can from the cabinet"),
+    "PlaceBookInShelf-v1":      (8,  "Place the book on the shelf"),
+    "PlaceCubeInDrawer-v1":     (9,  "Place the cube in the drawer"),
+    "PlaceDishInRack-v1":       (10, "Place the dish in the rack"),
+    "PlugCharger-v1":           (11, "Plug in the charger"),
+    "RaiseCube-v1":             (12, "Raise the cube up from the table"),
+    "RotateArrow-v1":           (13, "Rotate the arrow"),
+    "ScoopBanana-v1":           (14, "Scoop the banana"),
+    "StackCube-v1":             (15, "Stack one cube on top of another"),
+}
+
+# Bimanual Tasks (12 tasks) - Dual arm manipulation
+# Format: env_id -> (task_index, language_description)
+BIMANUAL_TASK_MAPPING = {
+    "DualArmDrawerOpen-v1":     (0,  "Open the drawer with dual arms"),
+    "DualArmDrawerPlace-v1":    (1,  "Place object in drawer with dual arms"),
+    "DualArmLiftPot-v1":        (2,  "Lift the pot with dual arms"),
+    "DualArmLiftTray-v1":       (3,  "Lift the tray with dual arms"),
+    "DualArmPenCap-v1":         (4,  "Cap the pen with dual arms"),
+    "DualArmPickBottle-v1":     (5,  "Pick up the bottle with dual arms"),
+    "DualArmPickCube-v1":       (6,  "Pick up the cube with dual arms"),
+    "DualArmPourPot-v1":        (7,  "Pour from the pot with dual arms"),
+    "DualArmPushBox-v1":        (8,  "Push the box with dual arms"),
+    "DualArmStack3Cube-v1":     (9,  "Stack three cubes with dual arms"),
+    "DualArmStackCube-v1":      (10, "Stack cubes with dual arms"),
+    "DualArmThreading-v1":      (11, "Thread the needle with dual arms"),
+}
+
+# Combined mapping for convenience
+ALL_TASK_MAPPING = {**SINGLE_ARM_TASK_MAPPING, **BIMANUAL_TASK_MAPPING}
+
+
+def get_task_info(env_id: str) -> Tuple[Optional[int], Optional[str]]:
+    """
+    Get task_index and language description for an env_id.
+
+    Args:
+        env_id: Environment ID (e.g., "RaiseCube-v1", "DualArmLiftPot-v1")
+
+    Returns:
+        Tuple of (task_index, task_description) or (None, None) if not found
+    """
+    if env_id in ALL_TASK_MAPPING:
+        return ALL_TASK_MAPPING[env_id]
+    return None, None
+
+
+def is_bimanual_task(env_id: str) -> bool:
+    """Check if the task is a bimanual (dual-arm) task."""
+    return env_id.startswith("DualArm") or env_id in BIMANUAL_TASK_MAPPING
 
 
 class ManiSkillVectorEnvWrapper(gym.Wrapper):
@@ -173,6 +239,8 @@ def create_maniskill_envs(
     sim_backend: str = "auto",
     camera_name: str = "base_camera",
     state_dim: int = 9,
+    observation_height: int = 480,
+    observation_width: int = 640,
     env_cls=None,
 ) -> Dict[str, Dict[int, gym.vector.VectorEnv]]:
     """
@@ -188,6 +256,8 @@ def create_maniskill_envs(
         sim_backend: Simulation backend ("auto", "gpu", "cpu")
         camera_name: Camera name for RGB observations
         state_dim: State dimension (qpos dimensions to use)
+        observation_height: Camera image height (must match training data)
+        observation_width: Camera image width (must match training data)
         env_cls: Not used, kept for API compatibility
 
     Returns:
@@ -196,14 +266,26 @@ def create_maniskill_envs(
     """
     # Parse task string: "TaskName" or "TaskName::description"
     if '::' in task:
+        # User provided custom description
         task_name, task_description = task.split('::', 1)
         task_name = task_name.strip()
         task_description = task_description.strip()
     else:
-        task_name = task
-        task_description = f"Complete the {task} task."
+        # Look up task description from mapping (MUST match training data!)
+        task_name = task.strip()
+        task_index, task_description = get_task_info(task_name)
 
-    # Create the ManiSkill environment
+        if task_description is None:
+            # Unknown task - warn user
+            print(f"  WARNING: Unknown task '{task_name}', not found in task mapping!")
+            print(f"  Available single-arm tasks: {list(SINGLE_ARM_TASK_MAPPING.keys())}")
+            print(f"  Available bimanual tasks: {list(BIMANUAL_TASK_MAPPING.keys())}")
+            task_description = f"Complete the {task_name} task."
+        else:
+            print(f"  Found task in mapping: [{task_index}] \"{task_description}\"")
+
+    # Create the ManiSkill environment with custom camera resolution
+    # Use sensor_configs to override the default camera resolution
     env_kwargs = {
         "obs_mode": obs_mode,
         "control_mode": control_mode,
@@ -211,6 +293,12 @@ def create_maniskill_envs(
         "sim_backend": sim_backend,
         "num_envs": n_envs,
         "max_episode_steps": episode_length,
+        "sensor_configs": {
+            camera_name: {
+                "width": observation_width,
+                "height": observation_height,
+            }
+        },
     }
 
     print(f"Creating ManiSkill environment: {task_name}")
@@ -218,6 +306,7 @@ def create_maniskill_envs(
     print(f"  control_mode: {control_mode}")
     print(f"  obs_mode: {obs_mode}")
     print(f"  max_episode_steps: {episode_length}")
+    print(f"  camera_resolution: {observation_width}x{observation_height}")
     print(f"  task_description: {task_description}")
 
     # Create base environment
