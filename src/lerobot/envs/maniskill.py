@@ -202,6 +202,11 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         if isinstance(info.get('is_success'), np.ndarray):
             terminated = np.logical_or(terminated, info['is_success'])
 
+        # Provide final_info so LeRobot can read success at episode end
+        if isinstance(terminated, np.ndarray) and isinstance(truncated, np.ndarray):
+            if np.any(terminated | truncated):
+                info["final_info"] = {"is_success": info["is_success"]}
+
         if self._debug:
             print(
                 "[ManiSkillWrapper.step]",
@@ -217,6 +222,8 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
     def render(self):
         """Render all environments for video."""
         frame = self.env.render()
+        if hasattr(frame, "cpu"):
+            frame = frame.cpu().numpy()
         if self._debug:
             if frame is None:
                 print("[ManiSkillWrapper.render] frame=None")
