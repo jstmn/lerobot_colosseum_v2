@@ -301,6 +301,13 @@ def create_maniskill_envs(
         },
     }
 
+    # Colosseum v2 tasks require distraction_set parameter
+    # These are all tasks in SINGLE_ARM_TASK_MAPPING (Colosseum v2 benchmark)
+    if task_name in SINGLE_ARM_TASK_MAPPING:
+        # Use empty distraction_set to disable all distractions (match training data)
+        env_kwargs["distraction_set"] = {}
+        print(f"  Adding distraction_set={{}} for Colosseum v2 task")
+
     print(f"Creating ManiSkill environment: {task_name}")
     print(f"  n_envs: {n_envs}")
     print(f"  control_mode: {control_mode}")
