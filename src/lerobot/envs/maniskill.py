@@ -175,6 +175,10 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         """Step and convert observation."""
         obs, reward, terminated, truncated, info = self.env.step(action)
 
+        # Convert reward to numpy if needed
+        if hasattr(reward, 'cpu'):
+            reward = reward.cpu().numpy()
+
         # Ensure info has 'is_success' for each environment
         if 'is_success' not in info:
             if 'success' in info:
