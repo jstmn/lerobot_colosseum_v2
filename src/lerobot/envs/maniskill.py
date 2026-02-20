@@ -179,6 +179,12 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         if hasattr(reward, 'cpu'):
             reward = reward.cpu().numpy()
 
+        # Convert terminated/truncated to numpy if needed
+        if hasattr(terminated, 'cpu'):
+            terminated = terminated.cpu().numpy()
+        if hasattr(truncated, 'cpu'):
+            truncated = truncated.cpu().numpy()
+
         # Ensure info has 'is_success' for each environment
         if 'is_success' not in info:
             if 'success' in info:
