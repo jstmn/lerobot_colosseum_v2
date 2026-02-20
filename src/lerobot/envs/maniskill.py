@@ -216,7 +216,13 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
 
     def render(self):
         """Render all environments for video."""
-        return self.env.render()
+        frame = self.env.render()
+        if self._debug:
+            if frame is None:
+                print("[ManiSkillWrapper.render] frame=None")
+            else:
+                print("[ManiSkillWrapper.render] frame shape:", getattr(frame, "shape", None))
+        return frame
 
     def _convert_obs(self, obs: Dict[str, Any]) -> Dict[str, np.ndarray]:
         """
@@ -325,6 +331,8 @@ def create_maniskill_envs(
         "control_mode": control_mode,
         "render_mode": render_mode,
         "sim_backend": sim_backend,
+        # Ensure offscreen render cameras are configured for video capture
+        "human_render_camera_configs": "default",
         "reward_mode": "sparse",
         "num_envs": n_envs,
         "max_episode_steps": episode_length,
