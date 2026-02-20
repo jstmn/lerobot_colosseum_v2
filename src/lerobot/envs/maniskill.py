@@ -332,7 +332,10 @@ def create_maniskill_envs(
         "render_mode": render_mode,
         "sim_backend": sim_backend,
         # Ensure offscreen render cameras are configured for video capture
-        "human_render_camera_configs": "default",
+        "human_render_camera_configs": {
+            "width": observation_width,
+            "height": observation_height,
+        },
         "reward_mode": "sparse",
         "num_envs": n_envs,
         "max_episode_steps": episode_length,
