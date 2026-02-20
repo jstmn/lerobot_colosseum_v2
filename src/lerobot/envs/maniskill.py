@@ -52,21 +52,19 @@ SINGLE_ARM_TASK_MAPPING = {
     "StackCube-v1":             (15, "Stack one cube on top of another"),
 }
 
-# Bimanual Tasks (12 tasks) - Dual arm manipulation
+# Bimanual Tasks (9 tasks) - Dual arm manipulation
 # Format: env_id -> (task_index, language_description)
+# Note: Most dual-arm tasks are v0, only DualArmPushBox is v1
 BIMANUAL_TASK_MAPPING = {
-    "DualArmDrawerOpen-v1":     (0,  "Open the drawer with dual arms"),
-    "DualArmDrawerPlace-v1":    (1,  "Place object in drawer with dual arms"),
-    "DualArmLiftPot-v1":        (2,  "Lift the pot with dual arms"),
-    "DualArmLiftTray-v1":       (3,  "Lift the tray with dual arms"),
-    "DualArmPenCap-v1":         (4,  "Cap the pen with dual arms"),
-    "DualArmPickBottle-v1":     (5,  "Pick up the bottle with dual arms"),
-    "DualArmPickCube-v1":       (6,  "Pick up the cube with dual arms"),
-    "DualArmPourPot-v1":        (7,  "Pour from the pot with dual arms"),
+    "DualArmDrawerOpen-v0":     (0,  "Open the drawer with dual arms"),
+    "DualArmDrawerPlace-v0":    (1,  "Place object in drawer with dual arms"),
+    "DualArmLiftPot-v0":        (2,  "Lift the pot with dual arms"),
+    "DualArmLiftTray-v0":       (3,  "Lift the tray with dual arms"),
+    "DualArmPenCap-v0":         (4,  "Cap the pen with dual arms"),
+    "DualArmPickBottle-v0":     (5,  "Pick up the bottle with dual arms"),
+    "DualArmPickCube-v0":       (6,  "Pick up the cube with dual arms"),
+    "DualArmPourPot-v0":        (7,  "Pour from the pot with dual arms"),
     "DualArmPushBox-v1":        (8,  "Push the box with dual arms"),
-    "DualArmStack3Cube-v1":     (9,  "Stack three cubes with dual arms"),
-    "DualArmStackCube-v1":      (10, "Stack cubes with dual arms"),
-    "DualArmThreading-v1":      (11, "Thread the needle with dual arms"),
 }
 
 # Combined mapping for convenience
