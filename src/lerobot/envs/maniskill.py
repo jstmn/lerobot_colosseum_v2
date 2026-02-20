@@ -20,6 +20,7 @@ This module provides native ManiSkill environment support for LeRobot evaluation
 
 import gymnasium as gym
 import numpy as np
+import os
 from typing import Any, Dict, Tuple, Optional
 
 # Import ManiSkill to register environments
@@ -118,6 +119,7 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         # Output camera name for LeRobot (to match training data)
         self._output_camera_name = output_camera_name if output_camera_name else camera_name
         self._state_dim = state_dim
+        self._debug = bool(int(os.getenv("LEROBOT_MANISKILL_DEBUG", "0")))
 
         # Store metadata
         if not hasattr(self, 'metadata'):
@@ -195,6 +197,20 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         # Convert tensors to numpy if needed
         if hasattr(info.get('is_success'), 'cpu'):
             info['is_success'] = info['is_success'].cpu().numpy()
+
+        # Terminate immediately on success to align with eval expectations
+        if isinstance(info.get('is_success'), np.ndarray):
+            terminated = np.logical_or(terminated, info['is_success'])
+
+        if self._debug:
+            print(
+                "[ManiSkillWrapper.step]",
+                f"reward_mode={getattr(self.unwrapped, 'reward_mode', None)}",
+                f"reward_type={type(reward)}",
+                f"terminated_any={np.any(terminated) if isinstance(terminated, np.ndarray) else terminated}",
+                f"truncated_any={np.any(truncated) if isinstance(truncated, np.ndarray) else truncated}",
+                f"success_any={np.any(info['is_success'])}",
+            )
 
         return self._convert_obs(obs), reward, terminated, truncated, info
 
