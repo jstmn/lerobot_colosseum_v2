@@ -299,6 +299,7 @@ def create_maniskill_envs(
         "control_mode": control_mode,
         "render_mode": render_mode,
         "sim_backend": sim_backend,
+        "reward_mode": "sparse",
         "num_envs": n_envs,
         "max_episode_steps": episode_length,
         "sensor_configs": {
