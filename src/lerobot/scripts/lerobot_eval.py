@@ -315,6 +315,18 @@ def eval_policy(
         elif isinstance(env, gym.vector.AsyncVectorEnv):
             # Here we must render all frames and discard any we don't need.
             ep_frames.append(np.stack(env.call("render")[:n_to_render_now]))
+        else:
+            # Handle custom wrappers (e.g., ManiSkillVectorEnvWrapper)
+            # that are not standard gym VectorEnv but have similar interface
+            frame = env.render()
+            if frame is not None:
+                # Frame might be (H, W, C) for single env or (B, H, W, C) for batched
+                if frame.ndim == 3:
+                    # Single frame, add batch dimension
+                    ep_frames.append(frame[np.newaxis, ...])
+                else:
+                    # Already batched, slice to n_to_render_now
+                    ep_frames.append(frame[:n_to_render_now])
 
     if max_episodes_rendered > 0:
         video_paths: list[str] = []
