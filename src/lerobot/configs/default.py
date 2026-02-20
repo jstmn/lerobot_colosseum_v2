@@ -56,6 +56,8 @@ class EvalConfig:
     batch_size: int = 50
     # `use_async_envs` specifies whether to use asynchronous environments (multiprocessing).
     use_async_envs: bool = False
+    # Number of episodes to render and save as videos (0 = disable)
+    max_episodes_rendered: int = 10
 
     def __post_init__(self) -> None:
         if self.batch_size > self.n_episodes:
