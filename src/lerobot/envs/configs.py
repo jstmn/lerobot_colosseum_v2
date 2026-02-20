@@ -475,9 +475,29 @@ class ManiSkillEnv(EnvConfig):
     render_mode: str = "rgb_array"
     sim_backend: str = "auto"
     camera_name: str = "base_camera"
+    enable_cameras: bool = True
     state_dim: int = 9  # qpos dimension (7 arm joints + 2 gripper joints)
+    action_dim: int = 7  # single-arm ee delta pose (6) + gripper (1)
     observation_height: int = 480  # Camera image height (must match training data)
     observation_width: int = 640   # Camera image width (must match training data)
+
+    def __post_init__(self):
+        # Set action feature
+        self.features[ACTION] = PolicyFeature(type=FeatureType.ACTION, shape=(self.action_dim,))
+        self.features_map[ACTION] = ACTION
+
+        # Set state feature
+        self.features[OBS_STATE] = PolicyFeature(type=FeatureType.STATE, shape=(self.state_dim,))
+        self.features_map[OBS_STATE] = OBS_STATE
+
+        # Set camera feature (single camera output)
+        if self.enable_cameras:
+            cam_key = self.camera_name
+            self.features[cam_key] = PolicyFeature(
+                type=FeatureType.VISUAL,
+                shape=(self.observation_height, self.observation_width, 3),
+            )
+            self.features_map[cam_key] = f"{OBS_IMAGES}.{cam_key}"
 
     @property
     def gym_kwargs(self) -> dict:
