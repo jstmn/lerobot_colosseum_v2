@@ -107,13 +107,16 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         task_description: str,
         max_episode_steps: int,
         camera_name: str = "base_camera",
+        output_camera_name: str = None,
         state_dim: int = 9,
     ):
         super().__init__(env)
         self._task = task
         self._task_description = task_description
         self._max_episode_steps_val = max_episode_steps
-        self._camera_name = camera_name
+        self._camera_name = camera_name  # Actual camera name in ManiSkill env
+        # Output camera name for LeRobot (to match training data)
+        self._output_camera_name = output_camera_name if output_camera_name else camera_name
         self._state_dim = state_dim
 
         # Store metadata
@@ -195,7 +198,7 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
 
         ManiSkill format (vectorized):
             {
-                'sensor_data': {'base_camera': {'rgb': (B, H, W, 3)}},
+                'sensor_data': {'camera_center': {'rgb': (B, H, W, 3)}},
                 'agent': {'qpos': (B, state_dim)}
             }
 
@@ -204,9 +207,12 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
                 'pixels': {'base_camera': (B, H, W, 3) uint8},
                 'agent_pos': (B, state_dim) float32
             }
+
+        Note: camera_name may differ between env and output (e.g., camera_center -> base_camera)
         """
-        camera_name = self._camera_name
-        rgb = obs['sensor_data'][camera_name]['rgb']
+        # Get RGB from the actual camera in the environment
+        env_camera_name = self._camera_name
+        rgb = obs['sensor_data'][env_camera_name]['rgb']
 
         # Convert to numpy
         if hasattr(rgb, 'cpu'):
@@ -223,8 +229,10 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         state_dim = self._state_dim
         agent_pos = qpos[..., :state_dim].astype(np.float32)
 
+        # Use output camera name (to match training data format)
+        output_camera_name = self._output_camera_name
         return {
-            'pixels': {camera_name: rgb},
+            'pixels': {output_camera_name: rgb},
             'agent_pos': agent_pos,
         }
 
@@ -285,7 +293,7 @@ def create_maniskill_envs(
             print(f"  Found task in mapping: [{task_index}] \"{task_description}\"")
 
     # Create the ManiSkill environment with custom camera resolution
-    # Use sensor_configs to override the default camera resolution
+    # Use global sensor_configs to apply to ALL cameras (not camera-specific)
     env_kwargs = {
         "obs_mode": obs_mode,
         "control_mode": control_mode,
@@ -294,18 +302,27 @@ def create_maniskill_envs(
         "num_envs": n_envs,
         "max_episode_steps": episode_length,
         "sensor_configs": {
-            camera_name: {
-                "width": observation_width,
-                "height": observation_height,
-            }
+            # Global config applied to all cameras
+            "width": observation_width,
+            "height": observation_height,
         },
     }
+
+    # Determine the actual camera name used by the environment
+    # Colosseum v2 tasks use "camera_center", others use "base_camera"
+    env_camera_name = camera_name  # Default from config
+    output_camera_name = camera_name  # Name to use in output (for model compatibility)
 
     # Colosseum v2 tasks require distraction_set parameter
     # These are all tasks in SINGLE_ARM_TASK_MAPPING (Colosseum v2 benchmark)
     if task_name in SINGLE_ARM_TASK_MAPPING:
         # Use empty distraction_set to disable all distractions (match training data)
         env_kwargs["distraction_set"] = {}
+        # Colosseum v2 uses "camera_center" internally
+        env_camera_name = "camera_center"
+        # But output as "base_camera" to match training data format
+        output_camera_name = "base_camera"
+        print(f"  Colosseum v2 task: using camera_center -> base_camera mapping")
         print(f"  Adding distraction_set={{}} for Colosseum v2 task")
 
     print(f"Creating ManiSkill environment: {task_name}")
@@ -314,6 +331,7 @@ def create_maniskill_envs(
     print(f"  obs_mode: {obs_mode}")
     print(f"  max_episode_steps: {episode_length}")
     print(f"  camera_resolution: {observation_width}x{observation_height}")
+    print(f"  env_camera: {env_camera_name} -> output_camera: {output_camera_name}")
     print(f"  task_description: {task_description}")
 
     # Create base environment
@@ -325,7 +343,8 @@ def create_maniskill_envs(
         task=task_name,
         task_description=task_description,
         max_episode_steps=episode_length,
-        camera_name=camera_name,
+        camera_name=env_camera_name,  # Actual camera name in env
+        output_camera_name=output_camera_name,  # Name to use in output
         state_dim=state_dim,
     )
 
