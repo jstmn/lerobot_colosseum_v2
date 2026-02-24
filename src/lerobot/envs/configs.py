@@ -502,8 +502,9 @@ class ManiSkillEnv(EnvConfig):
             self.action_dim = 16 if is_bimanual else 7
 
         # Auto-set control_mode for bimanual tasks
+        # Training data uses absolute joint positions, not delta!
         if is_bimanual:
-            self.control_mode = "pd_joint_delta_pos"
+            self.control_mode = "pd_joint_pos"
 
         # Set action feature
         self.features[ACTION] = PolicyFeature(type=FeatureType.ACTION, shape=(self.action_dim,))

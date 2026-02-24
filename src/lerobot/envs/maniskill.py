@@ -417,13 +417,14 @@ def create_maniskill_envs(
     # Auto-detect state_dim and control_mode based on task type
     # Bimanual tasks:
     #   - state_dim = 9 * 2 = 18 (two arms)
-    #   - control_mode = pd_joint_delta_pos (action_dim = 8 * 2 = 16)
+    #   - control_mode = pd_joint_pos (absolute joint positions, action_dim = 8 * 2 = 16)
+    #   - Training data uses absolute positions, NOT delta!
     # Single arm tasks:
     #   - state_dim = 9
     #   - control_mode = pd_ee_delta_pose (action_dim = 7)
     if is_bimanual_task(task_name):
         actual_state_dim = 18
-        actual_control_mode = "pd_joint_delta_pos"
+        actual_control_mode = "pd_joint_pos"  # Training data uses absolute joint positions
         env_kwargs["control_mode"] = actual_control_mode
         print(f"  Bimanual task detected: state_dim={actual_state_dim}, control_mode={actual_control_mode}")
     else:
