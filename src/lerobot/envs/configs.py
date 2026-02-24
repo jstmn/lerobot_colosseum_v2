@@ -466,6 +466,10 @@ class ManiSkillEnv(EnvConfig):
     Examples:
         lerobot-eval --env.type=maniskill --env.task="PickCube-v1"
         lerobot-eval --env.type=maniskill --env.task="PickCube-v1::Pick up the cube"
+
+    For bimanual tasks (DualArm*), state_dim and action_dim are automatically adjusted:
+        - Single arm: state_dim=9, action_dim=7 (pd_ee_delta_pose)
+        - Bimanual: state_dim=18, action_dim=16 (pd_joint_delta_pos)
     """
 
     task: str = "PickCube-v1"  # Can be "TaskName" or "TaskName::description"
@@ -476,12 +480,31 @@ class ManiSkillEnv(EnvConfig):
     sim_backend: str = "auto"
     camera_name: str = "base_camera"
     enable_cameras: bool = True
-    state_dim: int = 9  # qpos dimension (7 arm joints + 2 gripper joints)
-    action_dim: int = 7  # single-arm ee delta pose (6) + gripper (1)
+    state_dim: int | None = None  # Auto-detect based on task (9 for single arm, 18 for bimanual)
+    action_dim: int | None = None  # Auto-detect based on task (7 for single arm, 16 for bimanual)
     observation_height: int = 480  # Camera image height (must match training data)
     observation_width: int = 640   # Camera image width (must match training data)
 
+    def _is_bimanual_task(self) -> bool:
+        """Check if the task is a bimanual (dual-arm) task."""
+        # Extract task name (before :: if description is provided)
+        task_name = self.task.split("::")[0].strip() if "::" in self.task else self.task.strip()
+        return task_name.startswith("DualArm")
+
     def __post_init__(self):
+        # Auto-detect state_dim and action_dim based on task type
+        is_bimanual = self._is_bimanual_task()
+
+        if self.state_dim is None:
+            self.state_dim = 18 if is_bimanual else 9
+
+        if self.action_dim is None:
+            self.action_dim = 16 if is_bimanual else 7
+
+        # Auto-set control_mode for bimanual tasks
+        if is_bimanual:
+            self.control_mode = "pd_joint_delta_pos"
+
         # Set action feature
         self.features[ACTION] = PolicyFeature(type=FeatureType.ACTION, shape=(self.action_dim,))
         self.features_map[ACTION] = ACTION
