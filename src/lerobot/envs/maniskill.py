@@ -73,6 +73,44 @@ BIMANUAL_TASK_MAPPING = {
 # Combined mapping for convenience
 ALL_TASK_MAPPING = {**SINGLE_ARM_TASK_MAPPING, **BIMANUAL_TASK_MAPPING}
 
+# Tasks that support distraction_set parameter (true Colosseum v2 tasks)
+# These are tasks defined in mani_skill/envs/tasks/tabletop/colosseum_v2/
+# Some tasks like StackCube-v1, LiftPegUpright-v1, PegInsertionSide-v1, PlugCharger-v1
+# are original versions that do NOT support distraction_set
+COLOSSEUM_V2_TASKS = {
+    # Single arm Colosseum v2 tasks
+    "RaiseCube-v1",
+    "PickSodaFromCabinet-v1",
+    "PickDishFromRack-v1",
+    "PlaceBookInShelf-v1",
+    "PlaceDishInRack-v1",
+    "RotateArrow-v1",
+    "HammerNail-v1",
+    "ScoopBanana-v1",
+    "CookItemInPan-v1",
+    "OpenDrawer-v1",
+    "OpenCabinet-v1",
+    "PlaceCubeInDrawer-v1",
+    # ColosseumV2 specific versions (different from original)
+    "StackCubeColosseumV2-v1",
+    "LiftPegUprightColosseumV2-v1",
+    "PegInsertionSideColosseumV2-v1",
+    "PlugChargerColosseumV2-v1",
+    # All bimanual tasks are Colosseum v2
+    "DualArmDrawerOpen-v1",
+    "DualArmDrawerPlace-v1",
+    "DualArmLiftPot-v1",
+    "DualArmLiftTray-v1",
+    "DualArmPenCap-v1",
+    "DualArmPickBottle-v1",
+    "DualArmPickCube-v1",
+    "DualArmPourPot-v1",
+    "DualArmPushBox-v1",
+    "DualArmStackCube-v1",
+    "DualArmStack3Cube-v1",
+    "DualArmThreading-v1",
+}
+
 
 def get_task_info(env_id: str) -> Tuple[Optional[int], Optional[str]]:
     """
@@ -359,9 +397,10 @@ def create_maniskill_envs(
     env_camera_name = camera_name  # Default from config
     output_camera_name = camera_name  # Name to use in output (for model compatibility)
 
-    # Colosseum v2 tasks require distraction_set parameter
-    # These are all tasks in SINGLE_ARM_TASK_MAPPING (Colosseum v2 benchmark)
-    if task_name in SINGLE_ARM_TASK_MAPPING:
+    # Only true Colosseum v2 tasks support distraction_set parameter
+    # Some tasks like StackCube-v1, LiftPegUpright-v1, PegInsertionSide-v1, PlugCharger-v1
+    # are original versions that do NOT support distraction_set
+    if task_name in COLOSSEUM_V2_TASKS:
         # Use empty distraction_set to disable all distractions (match training data)
         env_kwargs["distraction_set"] = {}
         # ManiSkill 3.0.0b22: Colosseum v2 now uses "base_camera" directly
@@ -369,6 +408,11 @@ def create_maniskill_envs(
         output_camera_name = "base_camera"
         print(f"  Colosseum v2 task: using base_camera")
         print(f"  Adding distraction_set={{}} for Colosseum v2 task")
+    elif task_name in SINGLE_ARM_TASK_MAPPING or task_name in BIMANUAL_TASK_MAPPING:
+        # Known task but not Colosseum v2 - use base_camera without distraction_set
+        env_camera_name = "base_camera"
+        output_camera_name = "base_camera"
+        print(f"  Non-Colosseum v2 task: using base_camera (no distraction_set)")
 
     print(f"Creating ManiSkill environment: {task_name}")
     print(f"  n_envs: {n_envs}")
