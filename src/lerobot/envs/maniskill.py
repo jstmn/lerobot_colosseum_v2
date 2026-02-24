@@ -355,7 +355,7 @@ def create_maniskill_envs(
     }
 
     # Determine the actual camera name used by the environment
-    # Colosseum v2 tasks use "camera_center", others use "base_camera"
+    # ManiSkill 3.0.0b22: All Colosseum v2 tasks now use "base_camera"
     env_camera_name = camera_name  # Default from config
     output_camera_name = camera_name  # Name to use in output (for model compatibility)
 
@@ -364,11 +364,10 @@ def create_maniskill_envs(
     if task_name in SINGLE_ARM_TASK_MAPPING:
         # Use empty distraction_set to disable all distractions (match training data)
         env_kwargs["distraction_set"] = {}
-        # Colosseum v2 uses "camera_center" internally
-        env_camera_name = "camera_center"
-        # But output as "base_camera" to match training data format
+        # ManiSkill 3.0.0b22: Colosseum v2 now uses "base_camera" directly
+        env_camera_name = "base_camera"
         output_camera_name = "base_camera"
-        print(f"  Colosseum v2 task: using camera_center -> base_camera mapping")
+        print(f"  Colosseum v2 task: using base_camera")
         print(f"  Adding distraction_set={{}} for Colosseum v2 task")
 
     print(f"Creating ManiSkill environment: {task_name}")
