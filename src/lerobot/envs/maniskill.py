@@ -414,19 +414,26 @@ def create_maniskill_envs(
         output_camera_name = "base_camera"
         print(f"  Non-Colosseum v2 task: using base_camera (no distraction_set)")
 
-    # Auto-detect state_dim based on task type
-    # Bimanual tasks have 2 arms, so state_dim = 9 * 2 = 18
-    # Single arm tasks have state_dim = 9
+    # Auto-detect state_dim and control_mode based on task type
+    # Bimanual tasks:
+    #   - state_dim = 9 * 2 = 18 (two arms)
+    #   - control_mode = pd_joint_delta_pos (action_dim = 8 * 2 = 16)
+    # Single arm tasks:
+    #   - state_dim = 9
+    #   - control_mode = pd_ee_delta_pose (action_dim = 7)
     if is_bimanual_task(task_name):
         actual_state_dim = 18
-        print(f"  Bimanual task detected: using state_dim={actual_state_dim}")
+        actual_control_mode = "pd_joint_delta_pos"
+        env_kwargs["control_mode"] = actual_control_mode
+        print(f"  Bimanual task detected: state_dim={actual_state_dim}, control_mode={actual_control_mode}")
     else:
         actual_state_dim = 9
-        print(f"  Single arm task: using state_dim={actual_state_dim}")
+        actual_control_mode = control_mode  # Use the provided control_mode
+        print(f"  Single arm task: state_dim={actual_state_dim}, control_mode={actual_control_mode}")
 
     print(f"Creating ManiSkill environment: {task_name}")
     print(f"  n_envs: {n_envs}")
-    print(f"  control_mode: {control_mode}")
+    print(f"  control_mode: {actual_control_mode}")
     print(f"  obs_mode: {obs_mode}")
     print(f"  max_episode_steps: {episode_length}")
     print(f"  camera_resolution: {observation_width}x{observation_height}")
