@@ -414,6 +414,16 @@ def create_maniskill_envs(
         output_camera_name = "base_camera"
         print(f"  Non-Colosseum v2 task: using base_camera (no distraction_set)")
 
+    # Auto-detect state_dim based on task type
+    # Bimanual tasks have 2 arms, so state_dim = 9 * 2 = 18
+    # Single arm tasks have state_dim = 9
+    if is_bimanual_task(task_name):
+        actual_state_dim = 18
+        print(f"  Bimanual task detected: using state_dim={actual_state_dim}")
+    else:
+        actual_state_dim = 9
+        print(f"  Single arm task: using state_dim={actual_state_dim}")
+
     print(f"Creating ManiSkill environment: {task_name}")
     print(f"  n_envs: {n_envs}")
     print(f"  control_mode: {control_mode}")
@@ -421,6 +431,7 @@ def create_maniskill_envs(
     print(f"  max_episode_steps: {episode_length}")
     print(f"  camera_resolution: {observation_width}x{observation_height}")
     print(f"  env_camera: {env_camera_name} -> output_camera: {output_camera_name}")
+    print(f"  state_dim: {actual_state_dim}")
     print(f"  task_description: {task_description}")
 
     # Create base environment
@@ -434,7 +445,7 @@ def create_maniskill_envs(
         max_episode_steps=episode_length,
         camera_name=env_camera_name,  # Actual camera name in env
         output_camera_name=output_camera_name,  # Name to use in output
-        state_dim=state_dim,
+        state_dim=actual_state_dim,
     )
 
     # Return in LeRobot's expected format: {suite: {task_id: vec_env}}
