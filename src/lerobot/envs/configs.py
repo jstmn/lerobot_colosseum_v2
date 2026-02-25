@@ -484,6 +484,10 @@ class ManiSkillEnv(EnvConfig):
     action_dim: int | None = None  # Auto-detect based on task (7 for single arm, 16 for bimanual)
     observation_height: int = 480  # Camera image height (must match training data)
     observation_width: int = 640   # Camera image width (must match training data)
+    distraction_set: str = "NONE"  # Distraction set name: NONE, ALL, MO_COLOR, MO_TEXTURE, MO_SIZE, MO_MASS,
+                                   # RO_COLOR, RO_TEXTURE, RO_SIZE, TABLE_COLOR, TABLE_TEXTURE,
+                                   # CAMERA_POSE, LIGHT_COLOR, BACKGROUND_TEXTURE, BACKGROUND_COLOR,
+                                   # DISTRACTOR_OBJECT
 
     def _is_bimanual_task(self) -> bool:
         """Check if the task is a bimanual (dual-arm) task."""

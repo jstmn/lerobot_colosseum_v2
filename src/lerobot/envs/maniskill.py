@@ -327,6 +327,7 @@ def create_maniskill_envs(
     state_dim: int = 9,
     observation_height: int = 480,
     observation_width: int = 640,
+    distraction_set: str = "NONE",
     env_cls=None,
 ) -> Dict[str, Dict[int, gym.vector.VectorEnv]]:
     """
@@ -401,13 +402,19 @@ def create_maniskill_envs(
     # Some tasks like StackCube-v1, LiftPegUpright-v1, PegInsertionSide-v1, PlugCharger-v1
     # are original versions that do NOT support distraction_set
     if task_name in COLOSSEUM_V2_TASKS:
-        # Use empty distraction_set to disable all distractions (match training data)
-        env_kwargs["distraction_set"] = {}
+        from mani_skill.envs.tasks.tabletop.colosseum_v2.distraction_set import DISTRACTION_SETS
+        ds_key = distraction_set.upper()
+        if ds_key not in DISTRACTION_SETS:
+            raise ValueError(
+                f"Unknown distraction_set '{distraction_set}'. "
+                f"Valid options: {list(DISTRACTION_SETS.keys())}"
+            )
+        env_kwargs["distraction_set"] = DISTRACTION_SETS[ds_key]
         # ManiSkill 3.0.0b22: Colosseum v2 now uses "base_camera" directly
         env_camera_name = "base_camera"
         output_camera_name = "base_camera"
         print(f"  Colosseum v2 task: using base_camera")
-        print(f"  Adding distraction_set={{}} for Colosseum v2 task")
+        print(f"  Adding distraction_set={ds_key} for Colosseum v2 task")
     elif task_name in SINGLE_ARM_TASK_MAPPING or task_name in BIMANUAL_TASK_MAPPING:
         # Known task but not Colosseum v2 - use base_camera without distraction_set
         env_camera_name = "base_camera"
