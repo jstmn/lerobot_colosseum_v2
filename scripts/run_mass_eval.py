@@ -164,8 +164,8 @@ def save_placeholder_row(
         "num_eval_episodes": n_episodes,
         "max_episode_steps": episode_length,
         "message": "placeholder",
-        "num_sucessful_episodes": 0,
-        "success_percent": 0,
+        "num_sucessful_episodes": -1,
+        "success_percent": -1,
     }
     df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
     df.to_csv(csv_path, index=False)
@@ -485,8 +485,8 @@ def main():
                         n_episodes=args.n_episodes,
                         episode_length=args.episode_length,
                         message=f"error: {message}",
-                        num_successful=0,
-                        success_percent=0,
+                        num_successful=-1,
+                        success_percent=-1,
                     )
                     failed_tasks.append((task, distraction_set, message))
                     print(f"FAILED: {task} + {distraction_set} -> {message}")
@@ -504,8 +504,8 @@ def main():
                     n_episodes=args.n_episodes,
                     episode_length=args.episode_length,
                     message=f"exception: {error_msg}",
-                    num_successful=0,
-                    success_percent=0,
+                    num_successful=-1,
+                    success_percent=-1,
                 )
                 failed_tasks.append((task, distraction_set, error_msg))
                 print(f"EXCEPTION: {task} + {distraction_set} -> {error_msg}")
