@@ -448,11 +448,20 @@ def create_maniskill_envs(
     print(f"  env_camera: {env_camera_name} -> output_camera: {output_camera_name}")
     print(f"  state_dim: {actual_state_dim}")
     print(f"  task_description: {task_description}")
+    print(f"  env_kwargs: {env_kwargs}")
+    import sys
+    sys.stdout.flush()  # Force flush to ensure logs are printed immediately
 
     # Create base environment
+    print("[Step 1/4] Calling gym.make()...")
+    sys.stdout.flush()
     env = gym.make(task_name, **env_kwargs)
+    print(f"[Step 2/4] gym.make() completed. env.num_envs = {env.num_envs}")
+    sys.stdout.flush()
 
     # Wrap with LeRobot adapter
+    print("[Step 3/4] Creating ManiSkillVectorEnvWrapper...")
+    sys.stdout.flush()
     wrapped_env = ManiSkillVectorEnvWrapper(
         env,
         task=task_name,
@@ -462,6 +471,8 @@ def create_maniskill_envs(
         output_camera_name=output_camera_name,  # Name to use in output
         state_dim=actual_state_dim,
     )
+    print("[Step 4/4] ManiSkillVectorEnvWrapper created successfully.")
+    sys.stdout.flush()
 
     # Return in LeRobot's expected format: {suite: {task_id: vec_env}}
     return {"maniskill": {0: wrapped_env}}
