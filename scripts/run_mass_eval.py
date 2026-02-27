@@ -28,6 +28,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -105,6 +106,51 @@ CSV_COLUMNS = [
     "num_sucessful_episodes",  # Note: keeping original spelling for compatibility
     "success_percent",
 ]
+
+
+# ============================================================================
+# GPU Monitoring
+# ============================================================================
+
+def gpu_monitor(interval: float = 60.0, stop_event: threading.Event = None) -> None:
+    """Background thread to periodically print GPU usage via nvidia-smi.
+
+    This monitors actual GPU utilization and memory usage across all processes,
+    including subprocess (lerobot-eval).
+
+    Args:
+        interval: Time between prints in seconds (default: 60s = 1 minute)
+        stop_event: Threading event to signal when to stop monitoring
+    """
+    while not stop_event.is_set():
+        try:
+            # Use nvidia-smi to get GPU stats (works for all processes)
+            result = subprocess.run(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=index,utilization.gpu,memory.used,memory.total,temperature.gpu",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                for line in result.stdout.strip().split("\n"):
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) >= 5:
+                        gpu_idx, util, mem_used, mem_total, temp = parts[:5]
+                        print(f"[GPU {gpu_idx}] Util: {util}% | Memory: {mem_used}/{mem_total} MB | Temp: {temp}°C")
+            else:
+                print(f"[GPU Monitor] nvidia-smi error: {result.stderr}")
+        except FileNotFoundError:
+            print("[GPU Monitor] nvidia-smi not found, skipping GPU monitoring")
+            return
+        except Exception as e:
+            print(f"[GPU Monitor] Error: {e}")
+
+        # Wait for interval or until stop event is set
+        stop_event.wait(timeout=interval)
 
 
 # ============================================================================
@@ -241,20 +287,21 @@ def run_lerobot_eval(
     print(f"Command: {' '.join(cmd)}")
     print(f"{'='*60}\n")
 
+    # Start GPU monitoring thread
+    stop_gpu_monitor = threading.Event()
+    gpu_thread = threading.Thread(
+        target=gpu_monitor,
+        args=(60.0, stop_gpu_monitor),  # 60 seconds = 1 minute interval
+        daemon=True,
+    )
+    gpu_thread.start()
+
     try:
-        # Run the command and capture output
+        # Run the command with real-time output (no capture_output)
         result = subprocess.run(
             cmd,
-            capture_output=True,
-            text=True,
             timeout=3600,  # 1 hour timeout per evaluation
         )
-
-        # Print stdout/stderr for debugging
-        if result.stdout:
-            print(result.stdout)
-        if result.stderr:
-            print(result.stderr, file=sys.stderr)
 
         if result.returncode != 0:
             return False, 0, n_episodes, f"Command failed with return code {result.returncode}"
@@ -286,6 +333,10 @@ def run_lerobot_eval(
         return False, 0, n_episodes, f"JSON parse error: {e}"
     except Exception as e:
         return False, 0, n_episodes, str(e)
+    finally:
+        # Stop GPU monitoring thread
+        stop_gpu_monitor.set()
+        gpu_thread.join(timeout=2.0)
 
 
 # ============================================================================
