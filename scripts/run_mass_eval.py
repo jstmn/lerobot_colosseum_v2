@@ -26,6 +26,7 @@ Usage:
 import argparse
 import json
 import os
+import socket
 import subprocess
 import sys
 import threading
@@ -80,22 +81,25 @@ DISTRACTION_SETS = (
     "DISTRACTOR_OBJECT",
     "MO_COLOR",
     "MO_TEXTURE",
+    "MO_SIZE",
     "RO_COLOR",
     "RO_TEXTURE",
+    "RO_SIZE",
     "TABLE_COLOR",
     "TABLE_TEXTURE",
     "CAMERA_POSE",
     "LIGHT_COLOR",
-    "MO_SIZE",
-    "RO_SIZE",
     "BACKGROUND_TEXTURE",
     "BACKGROUND_COLOR",
-    "MO_MASS",
+    "LANGUAGE",
+    "POSE_RANDOMIZATION",
 )
 
-# CSV columns
+# CSV columns (matches ManiSkill eval_rgbd.py format)
 CSV_COLUMNS = [
     "checkpoint_path",
+    "pc_hostname",
+    "now",
     "distraction_set",
     "env_id",
     "control_mode",
@@ -184,7 +188,7 @@ def check_if_completed(df: pd.DataFrame, task: str, distraction_set: str) -> boo
     result_found = df[
         (df["env_id"] == task) &
         (df["distraction_set"].str.upper() == distraction_set.upper()) &
-        (df["message"] == "results")  # Only consider completed results
+        (df["message"] == "results_df")  # Only consider completed results
     ]
     return len(result_found) > 0
 
@@ -192,6 +196,8 @@ def check_if_completed(df: pd.DataFrame, task: str, distraction_set: str) -> boo
 def save_placeholder_row(
     csv_path: str,
     checkpoint_path: str,
+    pc_hostname: str,
+    now: str,
     task: str,
     distraction_set: str,
     control_mode: str,
@@ -203,6 +209,8 @@ def save_placeholder_row(
     df = pd.read_csv(csv_path)
     row = {
         "checkpoint_path": checkpoint_path,
+        "pc_hostname": pc_hostname,
+        "now": now,
         "distraction_set": distraction_set.lower(),
         "env_id": task,
         "control_mode": control_mode,
@@ -220,6 +228,8 @@ def save_placeholder_row(
 def save_result_row(
     csv_path: str,
     checkpoint_path: str,
+    pc_hostname: str,
+    now: str,
     task: str,
     distraction_set: str,
     control_mode: str,
@@ -234,6 +244,8 @@ def save_result_row(
     df = pd.read_csv(csv_path)
     row = {
         "checkpoint_path": checkpoint_path,
+        "pc_hostname": pc_hostname,
+        "now": now,
         "distraction_set": distraction_set.lower(),
         "env_id": task,
         "control_mode": control_mode,
@@ -325,7 +337,7 @@ def run_lerobot_eval(
 
         print(f"Results from eval_info.json: pc_success={pc_success:.2f}%, n_successful={n_successful}/{n_episodes}")
 
-        return True, n_successful, n_episodes, "results"
+        return True, n_successful, n_episodes, "results_df"
 
     except subprocess.TimeoutExpired:
         return False, 0, n_episodes, "timeout"
@@ -464,6 +476,10 @@ def main():
     # Initialize or load results CSV
     results_df = get_or_create_results_csv(args.results_csv)
 
+    # Get hostname and timestamp for CSV records
+    pc_hostname = socket.gethostname()
+    now = datetime.now().strftime("%Y:%m:%d__%H:%M:%S")
+
     # Track failures
     failed_tasks = []
     skipped_tasks = []
@@ -487,6 +503,8 @@ def main():
             save_placeholder_row(
                 csv_path=args.results_csv,
                 checkpoint_path=args.policy_path,
+                pc_hostname=pc_hostname,
+                now=now,
                 task=task,
                 distraction_set=distraction_set,
                 control_mode=control_mode,
@@ -512,6 +530,8 @@ def main():
                     save_result_row(
                         csv_path=args.results_csv,
                         checkpoint_path=args.policy_path,
+                        pc_hostname=pc_hostname,
+                        now=now,
                         task=task,
                         distraction_set=distraction_set,
                         control_mode=control_mode,
@@ -529,6 +549,8 @@ def main():
                     save_result_row(
                         csv_path=args.results_csv,
                         checkpoint_path=args.policy_path,
+                        pc_hostname=pc_hostname,
+                        now=now,
                         task=task,
                         distraction_set=distraction_set,
                         control_mode=control_mode,
@@ -548,6 +570,8 @@ def main():
                 save_result_row(
                     csv_path=args.results_csv,
                     checkpoint_path=args.policy_path,
+                    pc_hostname=pc_hostname,
+                    now=now,
                     task=task,
                     distraction_set=distraction_set,
                     control_mode=control_mode,
