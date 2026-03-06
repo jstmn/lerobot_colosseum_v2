@@ -162,16 +162,53 @@ def gpu_monitor(interval: float = 60.0, stop_event: threading.Event = None) -> N
 # ============================================================================
 
 def get_or_create_results_csv(csv_path: str) -> pd.DataFrame:
-    """Load existing CSV or create a new one with proper columns."""
+    """Load existing CSV or create a new one with proper columns.
+
+    Automatically migrates old CSV format (10 columns) to new format (12 columns):
+    - Adds pc_hostname and now columns
+    - Updates message field from "results" to "results_df"
+    - Removes MO_MASS distraction set rows (no longer supported)
+    """
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
-        # Verify columns match
-        if df.columns.tolist() != CSV_COLUMNS:
-            raise ValueError(
-                f"CSV columns mismatch!\n"
-                f"Expected: {CSV_COLUMNS}\n"
-                f"Got: {df.columns.tolist()}"
-            )
+        current_columns = df.columns.tolist()
+
+        # Check if migration is needed (old format has 10 columns, new has 12)
+        if current_columns != CSV_COLUMNS:
+            # Old format columns for reference
+            old_columns = [
+                "checkpoint_path", "distraction_set", "env_id", "control_mode",
+                "include_depth", "num_eval_episodes", "max_episode_steps",
+                "message", "num_sucessful_episodes", "success_percent",
+            ]
+
+            if current_columns == old_columns:
+                print(f"Detected old CSV format. Migrating to new format...")
+
+                # 1. Add pc_hostname and now columns after checkpoint_path
+                df.insert(1, "pc_hostname", "migrated")
+                df.insert(2, "now", "migrated")
+
+                # 2. Update message field: "results" -> "results_df"
+                df["message"] = df["message"].replace("results", "results_df")
+
+                # 3. Remove MO_MASS rows (no longer supported)
+                rows_before = len(df)
+                df = df[df["distraction_set"].str.upper() != "MO_MASS"]
+                rows_removed = rows_before - len(df)
+                if rows_removed > 0:
+                    print(f"Removed {rows_removed} MO_MASS rows (no longer supported)")
+
+                # Save migrated CSV
+                df.to_csv(csv_path, index=False)
+                print(f"Migration complete. Saved to {csv_path}")
+            else:
+                raise ValueError(
+                    f"CSV columns mismatch and not recognized as old format!\n"
+                    f"Expected: {CSV_COLUMNS}\n"
+                    f"Got: {current_columns}"
+                )
+
         return df
     else:
         # Create new empty DataFrame with columns
