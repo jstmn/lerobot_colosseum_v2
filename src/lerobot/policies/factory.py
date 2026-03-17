@@ -456,6 +456,13 @@ def make_policy(
     kwargs = {}
     if ds_meta is not None:
         features = dataset_to_policy_features(ds_meta.features)
+        # Apply rename_map to features if provided
+        if rename_map:
+            renamed_features = {}
+            for key, value in features.items():
+                new_key = rename_map.get(key, key)
+                renamed_features[new_key] = value
+            features = renamed_features
     else:
         if not cfg.pretrained_path:
             logging.warning(
