@@ -501,12 +501,20 @@ def _copy_and_reindex_data(
             mask = df["episode_index"].isin(list(episode_mapping.keys()))
             task_series: pd.Series = df[mask]["task_index"]
             all_task_indices.update(task_series.unique().tolist())
-        tasks = [src_dataset.meta.tasks.iloc[idx].name for idx in all_task_indices]
+        # Use task_index column lookup instead of positional iloc to support non-sequential indices
+        tasks = []
+        for idx in all_task_indices:
+            task_match = src_dataset.meta.tasks[src_dataset.meta.tasks["task_index"] == idx]
+            if len(task_match) > 0:
+                tasks.append(task_match.index[0])
+            else:
+                tasks.append(f"task_{idx}")
         dst_meta.save_episode_tasks(list(set(tasks)))
 
     task_mapping = {}
-    for old_task_idx in range(len(src_dataset.meta.tasks)):
-        task_name = src_dataset.meta.tasks.iloc[old_task_idx].name
+    for _, row in src_dataset.meta.tasks.iterrows():
+        old_task_idx = row["task_index"]
+        task_name = row.name  # index is the task description
         new_task_idx = dst_meta.get_task_index(task_name)
         if new_task_idx is not None:
             task_mapping[old_task_idx] = new_task_idx

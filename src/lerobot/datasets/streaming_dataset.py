@@ -353,7 +353,13 @@ class StreamingLeRobotDataset(torch.utils.data.IterableDataset):
         for update in updates:
             result.update(update)
 
-        result["task"] = self.meta.tasks.iloc[item["task_index"]].name
+        # Use task_index column lookup instead of positional iloc to support non-sequential indices
+        task_idx = item["task_index"]
+        task_match = self.meta.tasks[self.meta.tasks["task_index"] == task_idx]
+        if len(task_match) > 0:
+            result["task"] = task_match.index[0]
+        else:
+            result["task"] = f"task_{task_idx}"
 
         yield result
 

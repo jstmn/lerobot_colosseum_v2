@@ -1073,8 +1073,13 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 item[cam] = self.image_transforms(item[cam])
 
         # Add task as a string
+        # Use task_index column lookup instead of positional iloc to support non-sequential indices
         task_idx = item["task_index"].item()
-        item["task"] = self.meta.tasks.iloc[task_idx].name
+        task_match = self.meta.tasks[self.meta.tasks["task_index"] == task_idx]
+        if len(task_match) > 0:
+            item["task"] = task_match.index[0]
+        else:
+            item["task"] = f"task_{task_idx}"
         return item
 
     def __repr__(self):
