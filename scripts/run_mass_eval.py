@@ -492,11 +492,7 @@ def main():
         all_tasks = ALL_COLOSSEUM_V2_SINGLE_ARM_TASKS
         control_mode = "pd_ee_delta_pose"
         # Rename env camera keys to match pi05 expected feature names
-        eval_rename_map = {
-            "observation.images.external1_camera": "observation.images.base_0_rgb",
-            "observation.images.external2_camera": "observation.images.left_wrist_0_rgb",
-            "observation.images.hand_camera":      "observation.images.right_wrist_0_rgb",
-        }
+        eval_rename_map = None  # env already outputs external1/2_camera and hand_camera which match saved policy config
         print("Evaluating SINGLE ARM tasks")
 
     # Filter tasks if specified
