@@ -329,6 +329,7 @@ def run_lerobot_eval(
         f"--eval.n_episodes={n_episodes}",
         f"--eval.batch_size={batch_size}",
         "--eval.max_episodes_rendered=0",  # Disable video rendering for speed
+        "--policy.compile_model=false",   # Disable torch.compile at eval (training artifact)
         "--trust_remote_code=true",
         f"--env.distraction_set={distraction_set}",
         f"--output_dir={eval_output_dir}",
