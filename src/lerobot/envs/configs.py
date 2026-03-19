@@ -518,14 +518,18 @@ class ManiSkillEnv(EnvConfig):
         self.features[OBS_STATE] = PolicyFeature(type=FeatureType.STATE, shape=(self.state_dim,))
         self.features_map[OBS_STATE] = OBS_STATE
 
-        # Set camera feature (single camera output)
+        # Set camera features - single arm uses 3 cameras matching training data
         if self.enable_cameras:
-            cam_key = self.camera_name
-            self.features[cam_key] = PolicyFeature(
-                type=FeatureType.VISUAL,
-                shape=(self.observation_height, self.observation_width, 3),
-            )
-            self.features_map[cam_key] = f"{OBS_IMAGES}.{cam_key}"
+            if is_bimanual:
+                cam_keys = [self.camera_name]  # bimanual: single base_camera
+            else:
+                cam_keys = ["external1_camera", "external2_camera", "hand_camera"]
+            for cam_key in cam_keys:
+                self.features[cam_key] = PolicyFeature(
+                    type=FeatureType.VISUAL,
+                    shape=(self.observation_height, self.observation_width, 3),
+                )
+                self.features_map[cam_key] = f"{OBS_IMAGES}.{cam_key}"
 
     @property
     def gym_kwargs(self) -> dict:
