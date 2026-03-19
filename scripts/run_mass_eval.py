@@ -35,6 +35,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from lerobot.envs.maniskill import MAX_EPISODE_STEPS_BY_TASK
+
 
 # ============================================================================
 # Task Definitions
@@ -306,6 +308,7 @@ def run_lerobot_eval(
     n_episodes: int,
     episode_length: int,
     output_dir: str,
+    rename_map: dict = None,
 ) -> tuple[bool, int, int, str]:
     """
     Run lerobot-eval command and parse results from eval_info.json.
@@ -330,6 +333,9 @@ def run_lerobot_eval(
         f"--env.distraction_set={distraction_set}",
         f"--output_dir={eval_output_dir}",
     ]
+
+    if rename_map:
+        cmd.append(f"--rename_map={json.dumps(rename_map)}")
 
     print(f"\n{'='*60}")
     print(f"Running: {task} with distraction_set={distraction_set}")
@@ -459,6 +465,13 @@ def main():
         default=None,
         help="Specific distraction sets to evaluate (default: all 16 sets)",
     )
+    parser.add_argument(
+        "--max_episode_steps_from_lookup",
+        action="store_true",
+        default=False,
+        help="Use per-task episode length from MAX_EPISODE_STEPS_BY_TASK (mean+4*std of training data). "
+             "Falls back to --episode_length if task not in lookup.",
+    )
 
     args = parser.parse_args()
 
@@ -473,10 +486,17 @@ def main():
     if args.task_type == "bimanual":
         all_tasks = ALL_COLOSSEUM_V2_BIMANUAL_TASKS
         control_mode = "pd_joint_pos"
+        eval_rename_map = None  # bimanual camera mapping TBD
         print("Evaluating BIMANUAL tasks")
     else:
         all_tasks = ALL_COLOSSEUM_V2_SINGLE_ARM_TASKS
         control_mode = "pd_ee_delta_pose"
+        # Rename env camera keys to match pi05 expected feature names
+        eval_rename_map = {
+            "observation.images.external1_camera": "observation.images.base_0_rgb",
+            "observation.images.external2_camera": "observation.images.left_wrist_0_rgb",
+            "observation.images.hand_camera":      "observation.images.right_wrist_0_rgb",
+        }
         print("Evaluating SINGLE ARM tasks")
 
     # Filter tasks if specified
@@ -536,6 +556,17 @@ def main():
 
             print(f"\n[{eval_count}/{total_evals}] Starting: {task} + {distraction_set}")
 
+            # Determine episode length for this task
+            if args.max_episode_steps_from_lookup:
+                if task in MAX_EPISODE_STEPS_BY_TASK:
+                    task_episode_length = MAX_EPISODE_STEPS_BY_TASK[task]
+                    print(f"  max_episode_steps_from_lookup: {task} -> {task_episode_length} steps")
+                else:
+                    task_episode_length = args.episode_length
+                    print(f"  Warning: {task} not in MAX_EPISODE_STEPS_BY_TASK, using --episode_length={task_episode_length}")
+            else:
+                task_episode_length = args.episode_length
+
             # Save placeholder
             save_placeholder_row(
                 csv_path=args.results_csv,
@@ -547,7 +578,7 @@ def main():
                 control_mode=control_mode,
                 include_depth=args.include_depth,
                 n_episodes=args.n_episodes,
-                episode_length=args.episode_length,
+                episode_length=task_episode_length,
             )
 
             try:
@@ -558,8 +589,9 @@ def main():
                     distraction_set=distraction_set,
                     batch_size=args.batch_size,
                     n_episodes=args.n_episodes,
-                    episode_length=args.episode_length,
+                    episode_length=task_episode_length,
                     output_dir=str(output_dir),
+                    rename_map=eval_rename_map,
                 )
 
                 if success:

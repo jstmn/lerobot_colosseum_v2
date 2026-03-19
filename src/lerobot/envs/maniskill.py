@@ -73,6 +73,39 @@ BIMANUAL_TASK_MAPPING = {
 # Combined mapping for convenience
 ALL_TASK_MAPPING = {**SINGLE_ARM_TASK_MAPPING, **BIMANUAL_TASK_MAPPING}
 
+# Per-task max episode steps: mean + 4*std of training episode lengths
+# Source: jstmn/ManiSkill examples/baselines/act_clip/eval_rgbd.py
+MAX_EPISODE_STEPS_BY_TASK = {
+    "PickSodaFromCabinet-v1":       int(193   + 4 * 2.5),
+    "PickDishFromRack-v1":          int(119   + 4 * 9.26),
+    "StackCubeColosseumV2-v1":      int(107   + 4 * 8.97),
+    "PlaceDishInRack-v1":           int(251   + 4 * 19.07),
+    "LiftPegUprightColosseumV2-v1": int(198   + 4 * 6.51),
+    "RotateArrow-v1":               int(328   + 4 * 6.94),
+    "PegInsertionSideColosseumV2-v1": int(151 + 4 * 28.91),
+    "PlugChargerColosseumV2-v1":    int(179   + 4 * 13.83),
+    "HammerNail-v1":                int(225   + 4 * 5.6),
+    "ScoopBanana-v1":               int(242   + 4 * 20.05),
+    "OpenDrawer-v1":                int(118   + 4 * 3.72),
+    "OpenCabinet-v1":               int(475   + 4 * 4.15),
+    "PlaceCubeInDrawer-v1":         int(333   + 4 * 13.62),
+    "PlaceBookInShelf-v1":          int(182   + 4 * 8.54),
+    "CookItemInPan-v1":             int(473   + 4 * 15.12),
+    "RaiseCube-v1":                 int(78    + 4 * 3.55),
+    "DualArmPickCube-v1":           int(201.1 + 4 * 3.2),
+    "DualArmPickBottle-v1":         int(130.72 + 4 * 6.23),
+    "DualArmLiftPot-v1":            int(98.06 + 4 * 6.94),
+    "DualArmLiftTray-v1":           int(104.72 + 4 * 4.43),
+    "DualArmPushBox-v1":            int(93.04 + 4 * 9.43),
+    "DualArmPourPot-v1":            int(200.72 + 4 * 3.5),
+    "DualArmThreading-v1":          int(164.97 + 4 * 6.92),
+    "DualArmPenCap-v1":             int(186.1 + 4 * 11.54),
+    "DualArmDrawerPlace-v1":        int(186.35 + 4 * 4.0),
+    "DualArmDrawerOpen-v1":         int(81.0  + 4 * 9.4),
+    "DualArmStackCube-v1":          int(137.03 + 4 * 7.27),
+    "DualArmStack3Cube-v1":         int(242.08 + 4 * 10.5),
+}
+
 # Tasks that support distraction_set parameter (true Colosseum v2 tasks)
 # These are tasks defined in mani_skill/envs/tasks/tabletop/colosseum_v2/
 # Some tasks like StackCube-v1, LiftPegUpright-v1, PegInsertionSide-v1, PlugCharger-v1
@@ -149,21 +182,33 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         camera_name: str = "base_camera",
         output_camera_name: str = None,
         state_dim: int = 9,
+        camera_names: list = None,
     ):
         super().__init__(env)
         self._task = task
         self._task_description = task_description
         self._max_episode_steps_val = max_episode_steps
-        self._camera_name = camera_name  # Actual camera name in ManiSkill env
-        # Output camera name for LeRobot (to match training data)
-        self._output_camera_name = output_camera_name if output_camera_name else camera_name
         self._state_dim = state_dim
+        # Multi-camera support: list of (env_cam_name, output_cam_name) tuples
+        # Falls back to single camera if not provided
+        if camera_names is not None:
+            self._camera_names = camera_names  # list of (env_name, output_name)
+        else:
+            _out = output_camera_name if output_camera_name else camera_name
+            self._camera_names = [(camera_name, _out)]
+        # Keep for backward compat
+        self._camera_name = self._camera_names[0][0]
+        self._output_camera_name = self._camera_names[0][1]
         self._debug = bool(int(os.getenv("LEROBOT_MANISKILL_DEBUG", "0")))
 
         # Store metadata
         if not hasattr(self, 'metadata'):
             self.metadata = {}
         self.metadata['render_fps'] = 30
+
+        # Language instructions: sampled once at env creation, fixed for all episodes
+        self._current_task_descriptions = [task_description] * self.num_envs
+        self._randomize_language_instructions()
 
     @property
     def num_envs(self) -> int:
@@ -198,7 +243,7 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         LeRobot uses this to get task descriptions from all envs.
         """
         if method_name in ("task_description", "task"):
-            return [self._task_description] * self.num_envs
+            return list(self._current_task_descriptions)
         elif method_name == "_max_episode_steps":
             return [self._max_episode_steps_val] * self.num_envs
         elif hasattr(self.unwrapped, 'call'):
@@ -211,6 +256,17 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         """Reset and convert observation."""
         obs, info = self.env.reset(**kwargs)
         return self._convert_obs(obs), info
+
+    def _randomize_language_instructions(self):
+        """Randomize language instructions per episode if LANGUAGE distraction set is active."""
+        try:
+            base_env = self.env.unwrapped
+            if hasattr(base_env, "update_language_instructions"):
+                updated = base_env.update_language_instructions(self._current_task_descriptions)
+                if updated is not None:
+                    self._current_task_descriptions = updated
+        except Exception:
+            pass
 
     def step(self, action):
         """Step and convert observation."""
@@ -276,41 +332,34 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
 
         ManiSkill format (vectorized):
             {
-                'sensor_data': {'camera_center': {'rgb': (B, H, W, 3)}},
+                'sensor_data': {'external1_camera': {'rgb': (B, H, W, 3)}, ...},
                 'agent': {'qpos': (B, state_dim)}
             }
 
         LeRobot format:
             {
-                'pixels': {'base_camera': (B, H, W, 3) uint8},
+                'pixels': {'external1_camera': (B, H, W, 3) uint8, ...},
                 'agent_pos': (B, state_dim) float32
             }
-
-        Note: camera_name may differ between env and output (e.g., camera_center -> base_camera)
         """
-        # Get RGB from the actual camera in the environment
-        env_camera_name = self._camera_name
-        rgb = obs['sensor_data'][env_camera_name]['rgb']
-
-        # Convert to numpy
-        if hasattr(rgb, 'cpu'):
-            rgb = rgb.cpu().numpy()
-
-        if rgb.dtype != np.uint8:
-            rgb = rgb.astype(np.uint8)
-
         # Extract robot state
         qpos = obs['agent']['qpos']
         if hasattr(qpos, 'cpu'):
             qpos = qpos.cpu().numpy()
+        agent_pos = qpos[..., :self._state_dim].astype(np.float32)
 
-        state_dim = self._state_dim
-        agent_pos = qpos[..., :state_dim].astype(np.float32)
+        # Read all configured cameras
+        pixels = {}
+        for env_cam_name, out_cam_name in self._camera_names:
+            rgb = obs['sensor_data'][env_cam_name]['rgb']
+            if hasattr(rgb, 'cpu'):
+                rgb = rgb.cpu().numpy()
+            if rgb.dtype != np.uint8:
+                rgb = rgb.astype(np.uint8)
+            pixels[out_cam_name] = rgb
 
-        # Use output camera name (to match training data format)
-        output_camera_name = self._output_camera_name
         return {
-            'pixels': {output_camera_name: rgb},
+            'pixels': pixels,
             'agent_pos': agent_pos,
         }
 
@@ -393,10 +442,10 @@ def create_maniskill_envs(
         },
     }
 
-    # Determine the actual camera name used by the environment
-    # ManiSkill 3.0.0b22: All Colosseum v2 tasks now use "base_camera"
-    env_camera_name = camera_name  # Default from config
-    output_camera_name = camera_name  # Name to use in output (for model compatibility)
+    # Camera configuration: list of (env_cam_name, output_cam_name) tuples
+    # Single arm Colosseum v2: 3 cameras matching training data
+    # Bimanual: TBD (fall back to single base_camera for now)
+    task_camera_names = None  # will be set below
 
     # Only true Colosseum v2 tasks support distraction_set parameter
     # Some tasks like StackCube-v1, LiftPegUpright-v1, PegInsertionSide-v1, PlugCharger-v1
@@ -410,16 +459,21 @@ def create_maniskill_envs(
                 f"Valid options: {list(DISTRACTION_SETS.keys())}"
             )
         env_kwargs["distraction_set"] = DISTRACTION_SETS[ds_key]
-        # ManiSkill 3.0.0b22: Colosseum v2 now uses "base_camera" directly
-        env_camera_name = "base_camera"
-        output_camera_name = "base_camera"
-        print(f"  Colosseum v2 task: using base_camera")
+        env_kwargs["_env_id"] = task_name
         print(f"  Adding distraction_set={ds_key} for Colosseum v2 task")
-    elif task_name in SINGLE_ARM_TASK_MAPPING or task_name in BIMANUAL_TASK_MAPPING:
-        # Known task but not Colosseum v2 - use base_camera without distraction_set
-        env_camera_name = "base_camera"
-        output_camera_name = "base_camera"
-        print(f"  Non-Colosseum v2 task: using base_camera (no distraction_set)")
+
+    if not is_bimanual_task(task_name):
+        # Single arm: use all 3 cameras that match training data
+        task_camera_names = [
+            ("external1_camera", "external1_camera"),
+            ("external2_camera", "external2_camera"),
+            ("hand_camera",      "hand_camera"),
+        ]
+        print(f"  Single arm cameras: {[c[0] for c in task_camera_names]}")
+    else:
+        # Bimanual: fall back to single base_camera
+        task_camera_names = [("base_camera", "base_camera")]
+        print(f"  Bimanual task: using base_camera")
 
     # Auto-detect state_dim and control_mode based on task type
     # Bimanual tasks:
@@ -445,7 +499,7 @@ def create_maniskill_envs(
     print(f"  obs_mode: {obs_mode}")
     print(f"  max_episode_steps: {episode_length}")
     print(f"  camera_resolution: {observation_width}x{observation_height}")
-    print(f"  env_camera: {env_camera_name} -> output_camera: {output_camera_name}")
+    print(f"  cameras: {task_camera_names}")
     print(f"  state_dim: {actual_state_dim}")
     print(f"  task_description: {task_description}")
     print(f"  env_kwargs: {env_kwargs}")
@@ -456,6 +510,9 @@ def create_maniskill_envs(
     print("[Step 1/4] Calling gym.make()...")
     sys.stdout.flush()
     env = gym.make(task_name, **env_kwargs)
+    # gym.make() may wrap the env in a TimeLimitWrapper; unwrap to get the raw ManiSkill env
+    while not hasattr(env, 'num_envs') and hasattr(env, 'env'):
+        env = env.env
     print(f"[Step 2/4] gym.make() completed. env.num_envs = {env.num_envs}")
     sys.stdout.flush()
 
@@ -467,9 +524,8 @@ def create_maniskill_envs(
         task=task_name,
         task_description=task_description,
         max_episode_steps=episode_length,
-        camera_name=env_camera_name,  # Actual camera name in env
-        output_camera_name=output_camera_name,  # Name to use in output
         state_dim=actual_state_dim,
+        camera_names=task_camera_names,
     )
     print("[Step 4/4] ManiSkillVectorEnvWrapper created successfully.")
     sys.stdout.flush()
