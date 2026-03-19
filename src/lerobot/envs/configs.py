@@ -518,10 +518,10 @@ class ManiSkillEnv(EnvConfig):
         self.features[OBS_STATE] = PolicyFeature(type=FeatureType.STATE, shape=(self.state_dim,))
         self.features_map[OBS_STATE] = OBS_STATE
 
-        # Set camera features - single arm uses 3 cameras matching training data
+        # Set camera features matching training data
         if self.enable_cameras:
             if is_bimanual:
-                cam_keys = [self.camera_name]  # bimanual: single base_camera
+                cam_keys = ["external1_camera", "external2_camera", "panda1_hand_camera", "panda2_hand_camera"]
             else:
                 cam_keys = ["external1_camera", "external2_camera", "hand_camera"]
             for cam_key in cam_keys:

@@ -471,9 +471,14 @@ def create_maniskill_envs(
         ]
         print(f"  Single arm cameras: {[c[0] for c in task_camera_names]}")
     else:
-        # Bimanual: fall back to single base_camera
-        task_camera_names = [("base_camera", "base_camera")]
-        print(f"  Bimanual task: using base_camera")
+        # Bimanual: 4 cameras matching training data
+        task_camera_names = [
+            ("external1_camera",   "external1_camera"),
+            ("external2_camera",   "external2_camera"),
+            ("panda1_hand_camera", "panda1_hand_camera"),
+            ("panda2_hand_camera", "panda2_hand_camera"),
+        ]
+        print(f"  Bimanual cameras: {[c[0] for c in task_camera_names]}")
 
     # Auto-detect state_dim and control_mode based on task type
     # Bimanual tasks:
