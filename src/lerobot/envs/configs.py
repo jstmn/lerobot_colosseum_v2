@@ -260,6 +260,7 @@ class HILSerlRobotEnvConfig(EnvConfig):
 @dataclass
 class LiberoEnv(EnvConfig):
     task: str = "libero_10"  # can also choose libero_spatial, libero_object, etc.
+    task_ids: list[int] | None = None  # specific task IDs to evaluate (e.g., [0] for task 0 only)
     fps: int = 30
     episode_length: int | None = None
     obs_type: str = "pixels_agent_pos"
@@ -338,10 +339,13 @@ class LiberoEnv(EnvConfig):
 
     @property
     def gym_kwargs(self) -> dict:
-        return {
+        kwargs = {
             "obs_type": self.obs_type,
             "render_mode": self.render_mode,
         }
+        if self.task_ids is not None:
+            kwargs["task_ids"] = self.task_ids
+        return kwargs
 
 
 @EnvConfig.register_subclass("metaworld")
