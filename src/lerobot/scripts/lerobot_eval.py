@@ -174,6 +174,8 @@ def rollout(
         _sync_debug_step += 1
         if _sync_debug_step == 1:
             print(f"\n[SYNC DEBUG] === Step 1 Input (before env_preprocessor) ===")
+            if "task" in observation:
+                print(f"[SYNC DEBUG] task: {observation['task']}")
             if "observation.robot_state" in observation:
                 rs = observation["observation.robot_state"]
                 if isinstance(rs, dict) and "eef" in rs:
