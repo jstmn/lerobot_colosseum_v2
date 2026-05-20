@@ -55,8 +55,18 @@ class LiberoProcessorStep(ObservationProcessorStep):
             if key.startswith(f"{OBS_IMAGES}."):
                 img = processed_obs[key]
 
-                # Flip both H and W
+                # DEBUG: print image info before flip
+                if not hasattr(self, '_debug_printed'):
+                    self._debug_printed = True
+                    print(f"[DEBUG LiberoProcessorStep] Before flip: key={key}, shape={img.shape}, mean={img.mean().item():.4f}")
+
+                # Flip both H and W (180-degree rotation)
                 img = torch.flip(img, dims=[2, 3])
+
+                # DEBUG: print image info after flip
+                if hasattr(self, '_debug_printed') and self._debug_printed:
+                    print(f"[DEBUG LiberoProcessorStep] After flip: shape={img.shape}, mean={img.mean().item():.4f}")
+                    self._debug_printed = False
 
                 processed_obs[key] = img
         # Process robot_state into a flat state vector
