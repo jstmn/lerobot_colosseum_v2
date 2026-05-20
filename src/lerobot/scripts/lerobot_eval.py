@@ -159,6 +159,7 @@ def rollout(
         leave=False,
     )
     check_env_attributes_and_types(env)
+    _sync_debug_step = 0  # DEBUG: step counter for comparison with async
     while not np.all(done) and step < max_steps:
         # Numpy array to tensor and changing dictionary keys to LeRobot policy format.
         observation = preprocess_observation(observation)
@@ -169,13 +170,44 @@ def rollout(
         # TODO: works with SyncVectorEnv but not AsyncVectorEnv
         observation = add_envs_task(env, observation)
 
+        # DEBUG: Print first step raw inputs for comparison with async mode
+        _sync_debug_step += 1
+        if _sync_debug_step == 1:
+            print(f"\n[SYNC DEBUG] === Step 1 Input (before env_preprocessor) ===")
+            if "observation.robot_state" in observation:
+                rs = observation["observation.robot_state"]
+                if isinstance(rs, dict) and "eef" in rs:
+                    print(f"[SYNC DEBUG] raw eef_pos: {rs['eef']['pos']}")
+                    print(f"[SYNC DEBUG] raw eef_quat: {rs['eef']['quat']}")
+
         # Apply environment-specific preprocessing (e.g., LiberoProcessorStep for LIBERO)
         observation = env_preprocessor(observation)
 
         observation = preprocessor(observation)
+
+        # DEBUG: Print first step processed inputs
+        if _sync_debug_step == 1:
+            print(f"[SYNC DEBUG] === Step 1 Input (after preprocessor) ===")
+            if "observation.state" in observation:
+                print(f"[SYNC DEBUG] processed state: {observation['observation.state']}")
+            if "observation.images.image" in observation:
+                img = observation["observation.images.image"]
+                print(f"[SYNC DEBUG] image shape: {img.shape}, mean: {img.mean().item():.4f}")
+
         with torch.inference_mode():
             action = policy.select_action(observation)
+
+        # DEBUG: Print first step output action
+        if _sync_debug_step == 1:
+            print(f"[SYNC DEBUG] === Step 1 Output ===")
+            print(f"[SYNC DEBUG] raw action: {action}")
+
         action = postprocessor(action)
+
+        # DEBUG: Print first step postprocessed action
+        if _sync_debug_step == 1:
+            print(f"[SYNC DEBUG] postprocessed action: {action}")
+            print(f"[SYNC DEBUG] ===================\n")
 
         action_transition = {ACTION: action}
         action_transition = env_postprocessor(action_transition)
