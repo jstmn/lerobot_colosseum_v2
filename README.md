@@ -139,7 +139,7 @@ lerobot-eval \
 
 ## Mass Evaluation
 
-The following examples demonstrate evaluation using the **Pi0.5 (pi05)** model. This framework also supports other policy architectures including:
+The following examples demonstrate evaluation using the **Pi0.5 (pi05)** model. Our framework also supports other policy architectures including:
 - **X-VLA**
 - **Pi-0**
 - **Pi-0 Fast**
