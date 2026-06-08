@@ -217,11 +217,14 @@ Results are saved to a CSV file with columns:
 If you use this work, please cite:
 
 ```bibtex
-@article{colosseum2024,
-  title={Colosseum: A Benchmark for Evaluating Generalization for Robotic Manipulation},
-  author={...},
-  journal={...},
-  year={2024}
+@misc{morgan2026colosseumv2,
+  title={Colosseum V2: Benchmarking Generalization for Vision Language Action Models},
+  author={Jeremy Morgan and Prajwal Vijay and Hyeonho Oh and Jincen Song and Ashvin Arora and Alina Du and Gaurav Sukhatme and Jesse Thomason and Ishika Singh},
+  year={2026},
+  eprint={2605.27759},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO},
+  url={https://arxiv.org/abs/2605.27759}
 }
 ```
 
