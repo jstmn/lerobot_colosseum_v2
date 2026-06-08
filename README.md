@@ -30,40 +30,36 @@ This repository provides the **first native ManiSkill simulator integration** fo
 ## Supported Tasks
 
 ### Single-Arm Tasks (16)
-| Task | Episode Steps |
-|------|---------------|
-| RaiseCube-v1 | 92 |
-| PickSodaFromCabinet-v1 | 203 |
-| PickDishFromRack-v1 | 156 |
-| StackCubeColosseumV2-v1 | 143 |
-| PlaceBookInShelf-v1 | 216 |
-| PlaceDishInRack-v1 | 327 |
-| LiftPegUprightColosseumV2-v1 | 224 |
-| RotateArrow-v1 | 356 |
-| PegInsertionSideColosseumV2-v1 | 267 |
-| PlugChargerColosseumV2-v1 | 234 |
-| HammerNail-v1 | 247 |
-| ScoopBanana-v1 | 322 |
-| OpenDrawer-v1 | 133 |
-| OpenCabinet-v1 | 492 |
-| PlaceCubeInDrawer-v1 | 387 |
-| CookItemInPan-v1 | 533 |
+- RaiseCube-v1
+- PickSodaFromCabinet-v1
+- PickDishFromRack-v1
+- StackCubeColosseumV2-v1
+- PlaceBookInShelf-v1
+- PlaceDishInRack-v1
+- LiftPegUprightColosseumV2-v1
+- RotateArrow-v1
+- PegInsertionSideColosseumV2-v1
+- PlugChargerColosseumV2-v1
+- HammerNail-v1
+- ScoopBanana-v1
+- OpenDrawer-v1
+- OpenCabinet-v1
+- PlaceCubeInDrawer-v1
+- CookItemInPan-v1
 
 ### Bimanual Tasks (12)
-| Task | Episode Steps |
-|------|---------------|
-| DualArmPickCube-v1 | 214 |
-| DualArmPickBottle-v1 | 156 |
-| DualArmLiftPot-v1 | 126 |
-| DualArmLiftTray-v1 | 122 |
-| DualArmPushBox-v1 | 131 |
-| DualArmPourPot-v1 | 215 |
-| DualArmThreading-v1 | 193 |
-| DualArmPenCap-v1 | 232 |
-| DualArmDrawerPlace-v1 | 202 |
-| DualArmDrawerOpen-v1 | 119 |
-| DualArmStackCube-v1 | 166 |
-| DualArmStack3Cube-v1 | 284 |
+- DualArmPickCube-v1
+- DualArmPickBottle-v1
+- DualArmLiftPot-v1
+- DualArmLiftTray-v1
+- DualArmPushBox-v1
+- DualArmPourPot-v1
+- DualArmThreading-v1
+- DualArmPenCap-v1
+- DualArmDrawerPlace-v1
+- DualArmDrawerOpen-v1
+- DualArmStackCube-v1
+- DualArmStack3Cube-v1
 
 ## Installation
 
