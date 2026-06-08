@@ -146,7 +146,11 @@ The following examples demonstrate evaluation using the **Pi0.5 (pi05)** model. 
 - **DiT Policy**
 - **ACT**
 
-Users need to train their own policy models before evaluation.
+For Pi0.5 models, we provide pre-trained checkpoints that can be directly loaded from HuggingFace:
+- Single-Arm: `pythonsong/pi05_single_arm`
+- Bimanual: `pythonsong/pi05_bimanual`
+
+For other policy architectures, users need to train their own models.
 
 ### Single-Arm Evaluation
 ```bash
