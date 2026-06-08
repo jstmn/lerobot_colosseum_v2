@@ -69,16 +69,17 @@ cd lerobot_colosseum_v2
 pip install -e .
 ```
 
-### ManiSkill Dependencies
+### Colosseum V2 Dependencies
+
+To evaluate on Colosseum V2 benchmark, first install the Colosseum V2 repository:
 
 ```bash
-pip install mani_skill
+git clone https://github.com/jstmn/ColosseumV2.git
+cd ColosseumV2
+pip install -e .
 ```
 
-For GPU-accelerated rendering (recommended):
-```bash
-pip install mani_skill[cuda]
-```
+This will install ManiSkill with the required Colosseum V2 tasks and environments.
 
 ## Distraction Sets
 
