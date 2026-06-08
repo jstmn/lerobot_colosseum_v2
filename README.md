@@ -144,7 +144,7 @@ The following examples demonstrate evaluation using the **Pi0.5 (pi05)** model. 
 - **Pi0**
 - **Pi0-Fast**
 - **SmolVLA**
-- **DiT Policy**
+- **DiT-Policy**
 - **ACT**
 - and more...
 
