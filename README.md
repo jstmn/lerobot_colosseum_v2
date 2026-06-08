@@ -80,23 +80,7 @@ For GPU-accelerated rendering (recommended):
 pip install mani_skill[cuda]
 ```
 
-## Policy Inputs and Outputs
-
-### Observation Space
-
-| Key | Shape | Description |
-|-----|-------|-------------|
-| `observation.image` | `(480, 640, 3)` | RGB camera image (HWC, uint8) |
-| `observation.state` | `(9,)` or `(18,)` | Proprioceptive state (single-arm: 9, bimanual: 18) |
-
-### Action Space
-
-| Task Type | Action Dim | Control Mode | Description |
-|-----------|------------|--------------|-------------|
-| Single-Arm | 7 | `pd_ee_delta_pose` | End-effector delta pose (xyz + quaternion) |
-| Bimanual | 16 | `pd_joint_pos` | Joint positions for both arms |
-
-### Distraction Sets
+## Distraction Sets
 
 Colosseum V2 supports various perturbations for robustness testing:
 
