@@ -141,10 +141,10 @@ lerobot-eval \
 
 The following examples demonstrate evaluation using the **Pi0.5 (pi05)** model. This framework also supports other policy architectures including:
 - **X-VLA**
-- **Pi0**
-- **Pi0 Fast**
+- **Pi-0**
+- **Pi-0 Fast**
 - **SmolVLA**
-- **DiT Policy**
+- **Di-T Policy**
 - **ACT**
 - and more...
 
