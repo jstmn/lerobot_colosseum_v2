@@ -139,7 +139,14 @@ lerobot-eval \
 
 ## Mass Evaluation
 
-Run evaluation across all Colosseum V2 tasks with automatic per-task episode lengths:
+The following examples demonstrate evaluation using the **Pi0.5 (pi05)** model. This framework also supports other policy architectures including:
+- **X-VLA**
+- **Pi0 Fast**
+- **SmolVLA**
+- **DiT Policy**
+- **ACT**
+
+Users need to train their own policy models before evaluation.
 
 ### Single-Arm Evaluation
 ```bash
@@ -173,6 +180,52 @@ python scripts/run_mass_eval.py \
 | `--n_episodes` | Episodes per task |
 | `--use_per_task_episode_length` | Use optimal episode length from training data |
 | `--output_dir` | Output directory for results |
+
+## Training
+
+Train your own policy model on Colosseum V2 datasets:
+
+### Single-Arm Training
+```bash
+python src/lerobot/scripts/lerobot_train.py \
+  --dataset.repo_id=pythonsong/colosseum-single-arm-jan27 \
+  --dataset.revision=main \
+  --policy.type=pi05 \
+  --output_dir=/path/to/outputs/single_arm \
+  --job_name=pi05_training_single_arm \
+  --policy.repo_id=pythonsong/pi05_single_arm \
+  --policy.pretrained_path=lerobot/pi05_base \
+  --policy.compile_model=true \
+  --policy.gradient_checkpointing=true \
+  --wandb.enable=true \
+  --policy.dtype=bfloat16 \
+  --steps=30000 \
+  --policy.scheduler_decay_steps=30000 \
+  --policy.device=cuda \
+  --batch_size=8 \
+  --save_freq=1000000000
+```
+
+### Bimanual Training
+```bash
+python src/lerobot/scripts/lerobot_train.py \
+  --dataset.repo_id=pythonsong/colosseum-bimanual-jan27 \
+  --dataset.revision=main \
+  --policy.type=pi05 \
+  --output_dir=/path/to/outputs/bimanual \
+  --job_name=pi05_training_bimanual \
+  --policy.repo_id=pythonsong/pi05_bimanual \
+  --policy.pretrained_path=lerobot/pi05_base \
+  --policy.compile_model=true \
+  --policy.gradient_checkpointing=true \
+  --wandb.enable=true \
+  --policy.dtype=bfloat16 \
+  --steps=30000 \
+  --policy.scheduler_decay_steps=30000 \
+  --policy.device=cuda \
+  --batch_size=8 \
+  --save_freq=1000000000
+```
 
 ## Results
 
