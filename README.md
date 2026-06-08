@@ -30,36 +30,36 @@ This repository provides the **first native ManiSkill simulator integration** fo
 ## Supported Tasks
 
 ### Single-Arm Tasks (16)
-- RaiseCube-v1
-- PickSodaFromCabinet-v1
-- PickDishFromRack-v1
-- StackCubeColosseumV2-v1
-- PlaceBookInShelf-v1
-- PlaceDishInRack-v1
-- LiftPegUprightColosseumV2-v1
-- RotateArrow-v1
-- PegInsertionSideColosseumV2-v1
-- PlugChargerColosseumV2-v1
-- HammerNail-v1
-- ScoopBanana-v1
-- OpenDrawer-v1
-- OpenCabinet-v1
-- PlaceCubeInDrawer-v1
-- CookItemInPan-v1
+- RaiseCube
+- PickSodaFromCabinet
+- PickDishFromRack
+- StackCube
+- PlaceBookInShelf
+- PlaceDishInRack
+- LiftPegUpright
+- RotateArrow
+- PegInsertionSide
+- PlugCharger
+- HammerNail
+- ScoopBanana
+- OpenDrawer
+- OpenCabinet
+- PlaceCubeInDrawer
+- CookItemInPan
 
 ### Bimanual Tasks (12)
-- DualArmPickCube-v1
-- DualArmPickBottle-v1
-- DualArmLiftPot-v1
-- DualArmLiftTray-v1
-- DualArmPushBox-v1
-- DualArmPourPot-v1
-- DualArmThreading-v1
-- DualArmPenCap-v1
-- DualArmDrawerPlace-v1
-- DualArmDrawerOpen-v1
-- DualArmStackCube-v1
-- DualArmStack3Cube-v1
+- DualArmPickCube
+- DualArmPickBottle
+- DualArmLiftPot
+- DualArmLiftTray
+- DualArmPushBox
+- DualArmPourPot
+- DualArmThreading
+- DualArmPenCap
+- DualArmDrawerPlace
+- DualArmDrawerOpen
+- DualArmStackCube
+- DualArmStack3Cube
 
 ## Installation
 
