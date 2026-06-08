@@ -6,7 +6,7 @@
 
 # LeRobot Colosseum V2
 
-**Native ManiSkill Support for LeRobot**
+**The First Native ManiSkill Support for LeRobot**
 
 [![Python versions](https://img.shields.io/pypi/pyversions/lerobot)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/huggingface/lerobot/blob/main/LICENSE)
