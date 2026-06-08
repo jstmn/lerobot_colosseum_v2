@@ -141,10 +141,14 @@ lerobot-eval \
 
 The following examples demonstrate evaluation using the **Pi0.5 (pi05)** model. This framework also supports other policy architectures including:
 - **X-VLA**
+- **Pi0**
 - **Pi0 Fast**
 - **SmolVLA**
 - **DiT Policy**
 - **ACT**
+- and more...
+
+Any policy model compatible with the LeRobot framework can be evaluated on this benchmark.
 
 For Pi0.5 models, we provide pre-trained checkpoints that can be directly loaded from HuggingFace:
 - Single-Arm: `pythonsong/pi05_single_arm`
