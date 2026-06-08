@@ -17,7 +17,7 @@
 
 ## Overview
 
-This repository provides the **first native ManiSkill simulator integration** for [LeRobot](https://github.com/huggingface/lerobot), enabling evaluation of robotic policies on the [Colosseum V2 benchmark](https://jstmn.github.io/colosseum-v2-website/).
+This repository provides the **first native ManiSkill simulator implementation** for [LeRobot](https://github.com/huggingface/lerobot), enabling evaluation of robotic policies on the [Colosseum V2 benchmark](https://jstmn.github.io/colosseum-v2-website/).
 
 ### Key Features
 
