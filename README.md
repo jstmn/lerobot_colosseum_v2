@@ -21,7 +21,7 @@ This repository provides the **first native ManiSkill simulator implementation**
 
 ### Key Features
 
-- Native ManiSkill environment support for LeRobot evaluation
+- Native ManiSkill environment support for LeRobot training and evaluation
 - Full Colosseum V2 benchmark with 16 single-arm and 12 bimanual tasks
 - Support for all distraction sets (texture, lighting, camera, object variations)
 - Automatic per-task episode length based on training data statistics
