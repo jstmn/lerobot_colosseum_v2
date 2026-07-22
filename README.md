@@ -66,6 +66,8 @@ This repository provides the **first native ManiSkill simulator implementation**
 ```bash
 git clone https://github.com/Geeksongs/lerobot_colosseum_v2.git
 cd lerobot_colosseum_v2
+conda create -n lerobot_cv2 python=3.12
+conda activate lerobot_cv2
 pip install -e .
 ```
 
@@ -75,8 +77,7 @@ To evaluate on Colosseum V2 benchmark, first install the Colosseum V2 repository
 
 ```bash
 git clone https://github.com/jstmn/ColosseumV2.git
-cd ColosseumV2
-pip install -e .
+pip install -e ColosseumV2/pip install -e .
 ```
 
 This will install ManiSkill with the required Colosseum V2 tasks and environments.
