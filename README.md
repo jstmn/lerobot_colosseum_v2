@@ -23,7 +23,7 @@ This repository provides the **first native ManiSkill simulator implementation**
 
 - Native ManiSkill environment support for LeRobot training and evaluation
 - Full Colosseum V2 benchmark support with 16 single-arm and 12 bimanual tasks
-- Support for all distraction sets (texture, lighting, camera, object variations)
+- Support for all perturbation sets (visual, physical, and language)
 - Automatic per-task episode length based on training data statistics
 - Mass evaluation script with checkpoint resumption and real-time CSV logging
 
@@ -69,6 +69,12 @@ cd lerobot_colosseum_v2
 conda create -n lerobot_cv2 python=3.12
 conda activate lerobot_cv2
 pip install -e .
+pip install "transformers @ git+https://github.com/huggingface/transformers.git@fix/lerobot_openpi" # see https://github.com/huggingface/lerobot/issues/2305
+pip install 'numpy<2'
+
+# If using a 5090+:
+pip uninstall torch torchvision torchaudio
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 ```
 
 ### Colosseum V2 Dependencies
@@ -82,7 +88,7 @@ pip install -e ColosseumV2/pip install -e .
 
 This will install ManiSkill with the required Colosseum V2 tasks and environments.
 
-## Distraction Sets
+## Perturbation Sets
 
 Colosseum V2 supports various perturbations for robustness testing:
 
@@ -127,13 +133,13 @@ lerobot-eval \
   --output_dir=/path/to/outputs
 ```
 
-### With Distraction Set
+### With Perturbation Set
 ```bash
 lerobot-eval \
   --policy.path=pythonsong/pi05_single_arm \
   --env.type=maniskill \
   --env.task=PickCube-v1 \
-  --env.distraction_set=MO_COLOR \
+  --env.perturbation_set=MO_COLOR \
   --eval.n_episodes=200 \
   --eval.batch_size=100 \
   --output_dir=/path/to/outputs
@@ -244,7 +250,7 @@ Results are saved to a CSV file with columns:
 | Column | Description |
 |--------|-------------|
 | `env_id` | Task name |
-| `distraction_set` | Perturbation type |
+| `perturbation_set` | Perturbation type |
 | `num_eval_episodes` | Total episodes |
 | `num_sucessful_episodes` | Successful episodes |
 | `success_percent` | Success rate (%) |

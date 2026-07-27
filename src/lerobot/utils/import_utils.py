@@ -66,6 +66,7 @@ _peft_available = is_package_available("peft")
 _scipy_available = is_package_available("scipy")
 _reachy2_sdk_available = is_package_available("reachy2_sdk")
 
+assert _transformers_available, 'transformers is not available. install with `pip install "lerobot[pi]@git+https://github.com/huggingface/lerobot.git"`'
 
 def make_device_from_device_class(config: ChoiceRegistry) -> Any:
     """

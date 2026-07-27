@@ -227,7 +227,7 @@ def make_env(
             state_dim=cfg.state_dim,
             observation_height=cfg.observation_height,
             observation_width=cfg.observation_width,
-            distraction_set=cfg.distraction_set,
+            perturbation_set=cfg.perturbation_set,
             env_cls=env_cls,
         )
 
