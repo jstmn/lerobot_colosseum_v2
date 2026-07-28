@@ -451,14 +451,14 @@ def create_maniskill_envs(
     # Some tasks like StackCube-v1, LiftPegUpright-v1, PegInsertionSide-v1, PlugCharger-v1
     # are original versions that do NOT support perturbation_set
     if task_name in COLOSSEUM_V2_TASKS:
-        from mani_skill.envs.tasks.tabletop.colosseum_v2.perturbation_set import DISTRACTION_SETS
+        from mani_skill.envs.tasks.tabletop.colosseum_v2.perturbation_set import PERTURBATION_SETS
         ds_key = perturbation_set.upper()
-        if ds_key not in DISTRACTION_SETS:
+        if ds_key not in PERTURBATION_SETS:
             raise ValueError(
                 f"Unknown perturbation_set '{perturbation_set}'. "
-                f"Valid options: {list(DISTRACTION_SETS.keys())}"
+                f"Valid options: {list(PERTURBATION_SETS.keys())}"
             )
-        env_kwargs["perturbation_set"] = DISTRACTION_SETS[ds_key]
+        env_kwargs["perturbation_set"] = PERTURBATION_SETS[ds_key]
         env_kwargs["_env_id"] = task_name
         print(f"  Adding perturbation_set={ds_key} for Colosseum v2 task")
 

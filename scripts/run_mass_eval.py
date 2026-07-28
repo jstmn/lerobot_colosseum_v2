@@ -77,7 +77,7 @@ ALL_COLOSSEUM_V2_BIMANUAL_TASKS = (
 )
 
 # All perturbation sets from ManiSkill Colosseum V2
-DISTRACTION_SETS = (
+PERTURBATION_SETS = (
     "NONE",
     "ALL",
     "DISTRACTOR_OBJECT",
@@ -510,15 +510,15 @@ def main():
 
     # Filter perturbation sets if specified
     if args.perturbation_sets is not None:
-        perturbation_sets = tuple(d.upper() for d in args.perturbation_sets if d.upper() in DISTRACTION_SETS)
-        invalid_ds = [d for d in args.perturbation_sets if d.upper() not in DISTRACTION_SETS]
+        perturbation_sets = tuple(d.upper() for d in args.perturbation_sets if d.upper() in PERTURBATION_SETS)
+        invalid_ds = [d for d in args.perturbation_sets if d.upper() not in PERTURBATION_SETS]
         if invalid_ds:
             print(f"Warning: Invalid perturbation sets ignored: {invalid_ds}")
         if not perturbation_sets:
-            print(f"Error: No valid perturbation sets specified. Available: {DISTRACTION_SETS}")
+            print(f"Error: No valid perturbation sets specified. Available: {PERTURBATION_SETS}")
             sys.exit(1)
     else:
-        perturbation_sets = DISTRACTION_SETS
+        perturbation_sets = PERTURBATION_SETS
 
     # Calculate total evaluations
     total_evals = len(tasks) * len(perturbation_sets)

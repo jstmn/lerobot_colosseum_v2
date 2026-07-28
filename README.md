@@ -71,6 +71,8 @@ conda activate lerobot_cv2
 pip install -e .
 pip install "transformers @ git+https://github.com/huggingface/transformers.git@fix/lerobot_openpi" # see https://github.com/huggingface/lerobot/issues/2305
 pip install 'numpy<2'
+huggingface-cli login
+pip install 
 
 # If using a 5090+:
 pip uninstall torch torchvision torchaudio
@@ -83,7 +85,7 @@ To evaluate on Colosseum V2 benchmark, first install the Colosseum V2 repository
 
 ```bash
 git clone https://github.com/jstmn/ColosseumV2.git
-pip install -e ColosseumV2/pip install -e .
+pip install -e ColosseumV2
 ```
 
 This will install ManiSkill with the required Colosseum V2 tasks and environments.
@@ -110,7 +112,7 @@ Run evaluation on a single task using `lerobot-eval`:
 lerobot-eval \
   --policy.path=pythonsong/pi05_single_arm \
   --env.type=maniskill \
-  --env.task=PickCube-v1 \
+  --env.task=RaiseCube-v1 \
   --env.episode_length=200 \
   --eval.n_episodes=200 \
   --eval.batch_size=100 \
