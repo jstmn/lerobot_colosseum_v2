@@ -205,12 +205,13 @@ Train your own policy model on Colosseum V2 datasets:
 
 ### Single-Arm Training
 ```bash
+# Pi0.5
 python src/lerobot/scripts/lerobot_train.py \
   --dataset.repo_id=pythonsong/colosseum-single-arm-jan27 \
   --dataset.revision=main \
   --policy.type=pi05 \
   --output_dir=/path/to/outputs/single_arm \
-  --job_name=pi05_training_single_arm \
+  --job_name=pi05_training_single_arm__$(date +%Y-%m-%d--%H-%M-%S) \
   --policy.repo_id=pythonsong/pi05_single_arm \
   --policy.pretrained_path=lerobot/pi05_base \
   --policy.compile_model=true \
@@ -222,6 +223,28 @@ python src/lerobot/scripts/lerobot_train.py \
   --policy.device=cuda \
   --batch_size=8 \
   --save_freq=1000000000
+
+# MolmoAct2
+python src/lerobot/scripts/lerobot_train.py \
+  --dataset.repo_id=pythonsong/colosseum-single-arm-jan27 \
+  --dataset.revision=main \
+  --policy.type=molmoact2 \
+  --policy.checkpoint_path=allenai/MolmoAct2-LIBERO \
+  --output_dir=outputs/molmoact2_single_arm \
+  --job_name=molmoact2_training_single_arm__$(date +%Y-%m-%d--%H-%M-%S) \
+  --policy.repo_id=jstm/molmoact2_single_arm \
+  --policy.pretrained_path=lerobot/pi05_base \
+  --policy.compile_model=true \
+  --policy.gradient_checkpointing=true \
+  --wandb.enable=true \
+  --policy.dtype=bfloat16 \
+  --steps=10000 \
+  --batch_size=32 \
+  --num_workers=4 \
+  --log_freq=20 \
+  --env_eval_freq=-1 \
+  --save_checkpoint=true \
+  --save_freq=2000
 ```
 
 ### Bimanual Training
@@ -231,7 +254,7 @@ python src/lerobot/scripts/lerobot_train.py \
   --dataset.revision=main \
   --policy.type=pi05 \
   --output_dir=/path/to/outputs/bimanual \
-  --job_name=pi05_training_bimanual \
+  --job_name=pi05_training_bimanual__$(date +%Y-%m-%d--%H-%M-%S) \
   --policy.repo_id=pythonsong/pi05_bimanual \
   --policy.pretrained_path=lerobot/pi05_base \
   --policy.compile_model=true \
