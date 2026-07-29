@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-# Copyright 2025 Allen Institute for AI and The HuggingFace Inc. team. All rights reserved.
+# Copyright 2026 The Allen Institute for Artificial Intelligence and The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MolmoAct2 policy for LeRobot."""
+from .configuration_molmoact2 import MolmoAct2Config
+from .modeling_molmoact2 import MolmoAct2Policy
+from .processor_molmoact2 import make_molmoact2_pre_post_processors
 
-from lerobot.policies.molmoact2.configuration_molmoact2 import MolmoAct2Config
-from lerobot.policies.molmoact2.modeling_molmoact2 import MolmoAct2Policy
-from lerobot.policies.molmoact2.processor_molmoact2 import make_molmoact2_pre_post_processors
-
-__all__ = [
-    "MolmoAct2Config",
-    "MolmoAct2Policy",
-    "make_molmoact2_pre_post_processors",
-]
+__all__ = ["MolmoAct2Config", "MolmoAct2Policy", "make_molmoact2_pre_post_processors"]
