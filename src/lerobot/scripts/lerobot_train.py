@@ -55,6 +55,7 @@ from lerobot.envs import close_envs, make_env, make_env_pre_post_processors
 from lerobot.jobs import submit_to_hf
 from lerobot.optim.factory import make_optimizer_and_scheduler
 from lerobot.policies import PreTrainedPolicy, make_policy, make_pre_post_processors
+from lerobot.processor.rename_processor import rename_stats
 from lerobot.rewards import make_reward_pre_post_processors
 from lerobot.utils.collate import lerobot_collate_fn
 from lerobot.utils.import_utils import register_third_party_plugins
@@ -321,15 +322,16 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
     if cfg.is_reward_model_training:
         processor_kwargs["dataset_meta"] = dataset.meta
 
-    if cfg.policy.pretrained_path is not None:
-        # Apply rename_map to stats if provided
-        renamed_stats = rename_stats(dataset.meta.stats, cfg.rename_map) if cfg.rename_map else dataset.meta.stats
-        processor_kwargs["preprocessor_overrides"] = {
-    # if not cfg.is_reward_model_training and processor_pretrained_path is not None:
-        # preprocessor_overrides = {
+    if not cfg.is_reward_model_training and processor_pretrained_path is not None:
+        # From Geeksong for ColosseumV2 integration: when rename_map remaps dataset keys to the
+        # policy's expected feature names, the normalization stats (keyed by dataset feature names)
+        # must be renamed too so the (un)normalizer can look them up under the policy feature names.
+        stats = rename_stats(dataset.meta.stats, cfg.rename_map) if cfg.rename_map else dataset.meta.stats
+
+        preprocessor_overrides = {
             "device_processor": {"device": device.type},
             "normalizer_processor": {
-                "stats": renamed_stats,
+                "stats": stats,
                 "features": {**policy.config.input_features, **policy.config.output_features},
                 "norm_map": policy.config.normalization_mapping,
             },
@@ -337,7 +339,7 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
         }
         postprocessor_overrides = {
             "unnormalizer_processor": {
-                "stats": renamed_stats,
+                "stats": stats,
                 "features": policy.config.output_features,
                 "norm_map": policy.config.normalization_mapping,
             },
