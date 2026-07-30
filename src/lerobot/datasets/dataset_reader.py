@@ -94,6 +94,7 @@ class DatasetReader:
 
         self.hf_dataset: datasets.Dataset | None = None
         self._absolute_to_relative_idx: dict[int, int] | None = None
+        self._task_index_to_task: dict[int, str] | None = None
 
         # Setup delta_indices (doesn't depend on hf_dataset)
         self.delta_indices = None
@@ -309,6 +310,21 @@ class DatasetReader:
             futures = [pool.submit(_decode_single, k, ts) for k, ts in items]
             return dict(f.result() for f in futures)
 
+    def _lookup_task(self, task_idx: int) -> str:
+        """Map a ``task_index`` value to its task string.
+
+        Uses the ``task_index`` column of ``meta.tasks`` rather than row
+        position, since task indices can be non-contiguous (e.g. in datasets
+        where some tasks were filtered out without re-indexing). The lookup
+        dict is rebuilt if an unknown index is encountered, in case tasks
+        were added to the metadata after this reader was created.
+        """
+        if self._task_index_to_task is None or task_idx not in self._task_index_to_task:
+            self._task_index_to_task = dict(
+                zip(self._meta.tasks["task_index"], self._meta.tasks.index, strict=True)
+            )
+        return self._task_index_to_task[task_idx]
+
     def get_item(self, idx) -> dict:
         """Core __getitem__ logic. Assumes hf_dataset is loaded.
 
@@ -349,6 +365,6 @@ class DatasetReader:
 
         # Add task as a string
         task_idx = item["task_index"].item()
-        item["task"] = self._meta.tasks.iloc[task_idx].name
+        item["task"] = self._lookup_task(task_idx)
 
         return item

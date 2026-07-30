@@ -560,8 +560,6 @@ class StreamingLeRobotDataset(torch.utils.data.IterableDataset):
                     else result[key] / MM_PER_METRE
                 )
 
-        result["task"] = self.meta.tasks.iloc[item["task_index"]].name
-
         yield result
 
     def _get_query_timestamps(

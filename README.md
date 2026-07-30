@@ -207,6 +207,7 @@ Train your own policy model on Colosseum V2 datasets:
 
 ### Single-Arm Training
 ```bash
+
 # Pi0.5
 lerobot-train \
   --dataset.repo_id=pythonsong/colosseum-single-arm-jan27 \
@@ -223,8 +224,8 @@ lerobot-train \
   --steps=30000 \
   --policy.scheduler_decay_steps=30000 \
   --policy.device=cuda \
-  --batch_size=8 \
-  --save_freq=1000000000
+  --batch_size=1 \
+  --save_freq=1000
 
 # MolmoAct2
 lerobot-train \
