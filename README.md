@@ -77,6 +77,10 @@ pip install 'numpy<2' transformers
 conda install "ffmpeg" -c conda-forge
 hf auth login
 
+# Set the save directory, also consider WANDB_CACHE_DIR, WANDB_DATA_DIR, WANDB_DIR, WANDB_ARTIFACT_DIR
+echo "export LEROBOT_DATA_DIR=\"/PATH/TO/lerobot_data\"" >> ~/.bashrc; source ~/.bashrc
+
+
 # ONLY IF YOU HAVE CUDA 12.x:
 # The plain PyPI torchcodec wheel is built for CUDA 13 and fails to load
 # ("libnvrtc.so.13 not found") with cu12x builds of torch, so install from the cu126 index:
@@ -247,18 +251,19 @@ lerobot-train \
   --policy.control_mode="delta end-effector pose" \
   --policy.image_keys='["observation.images.external1_camera","observation.images.external2_camera","observation.images.hand_camera"]' \
   --policy.device=cuda \
-  --output_dir=outputs/molmoact2_single_arm__$(date +%Y-%m-%d--%H-%M-%S) \
+  --output_dir=$LEROBOT_DATA_DIR/outputs/molmoact2_single_arm__$(date +%Y-%m-%d--%H-%M-%S) \
   --job_name=molmoact2_training_single_arm \
   --policy.repo_id=jstm/molmoact2_single_arm \
   --policy.gradient_checkpointing=true \
   --wandb.enable=true \
+  --wandb.disable_artifact=true \
   --steps=10000 \
   --batch_size=32 \
   --num_workers=32 \
   --log_freq=20 \
   --env_eval_freq=-1 \
   --save_checkpoint=true \
-  --save_freq=2000
+  --save_freq=1000
 ```
 
 ### Bimanual Training
