@@ -64,17 +64,23 @@ This repository provides the **first native ManiSkill simulator implementation**
 ## Installation
 
 ```bash
+# Apt packages
+sudo apt install ffmpeg -y
+
+# 
 git clone https://github.com/Geeksongs/lerobot_colosseum_v2.git
 cd lerobot_colosseum_v2
 conda create -n lerobot_cv2 python=3.12
 conda activate lerobot_cv2
-pip install -e .
-pip install 'numpy<2'
+pip install -e .[dataset,training]
+pip install 'numpy<2' transformers
 conda install "ffmpeg" -c conda-forge
-# Note: the plain PyPI torchcodec wheel is built for CUDA 13 and fails to load
+hf auth login
+
+# ONLY IF YOU HAVE CUDA 12.x:
+# The plain PyPI torchcodec wheel is built for CUDA 13 and fails to load
 # ("libnvrtc.so.13 not found") with cu12x builds of torch, so install from the cu126 index:
 pip install "torchcodec==0.15" --index-url https://download.pytorch.org/whl/cu126
-huggingface-cli login
 
 # If using a 5090+:
 pip uninstall torch torchvision torchaudio
@@ -233,23 +239,26 @@ lerobot-train \
   --dataset.revision=main \
   --policy.type=molmoact2 \
   --policy.checkpoint_path=allenai/MolmoAct2-LIBERO \
+  --policy.action_mode=continuous \
+  --policy.train_action_expert_only=true \
+  --policy.chunk_size=10 \
+  --policy.n_action_steps=10 \
+  --policy.setup_type="single franka robotic arm in maniskill" \
+  --policy.control_mode="delta end-effector pose" \
+  --policy.image_keys='["observation.images.external1_camera","observation.images.external2_camera","observation.images.hand_camera"]' \
+  --policy.device=cuda \
   --output_dir=outputs/molmoact2_single_arm__$(date +%Y-%m-%d--%H-%M-%S) \
   --job_name=molmoact2_training_single_arm \
   --policy.repo_id=jstm/molmoact2_single_arm \
-  --policy.pretrained_path=lerobot/pi05_base \
   --policy.gradient_checkpointing=true \
   --wandb.enable=true \
   --steps=10000 \
   --batch_size=32 \
-  --num_workers=4 \
+  --num_workers=32 \
   --log_freq=20 \
   --env_eval_freq=-1 \
   --save_checkpoint=true \
   --save_freq=2000
-
-  # Not supported by MolmoAct2
-  # --policy.compile_model=true \
-  # --policy.dtype=bfloat16 \
 ```
 
 ### Bimanual Training
