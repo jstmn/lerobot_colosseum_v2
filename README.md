@@ -73,11 +73,11 @@ cd lerobot_colosseum_v2
 conda create -n lerobot_cv2 python=3.12
 conda activate lerobot_cv2
 pip install -e .[dataset,training]
-pip install 'numpy<2' transformers
+pip install 'numpy<2'
 conda install "ffmpeg" -c conda-forge
 hf auth login
 
-# Set the save directory, also consider WANDB_CACHE_DIR, WANDB_DATA_DIR, WANDB_DIR, WANDB_ARTIFACT_DIR
+# Set the save directory, also consider setting WANDB_CACHE_DIR, WANDB_DATA_DIR, WANDB_DIR, WANDB_ARTIFACT_DIR, HF_HOME
 echo "export LEROBOT_DATA_DIR=\"/PATH/TO/lerobot_data\"" >> ~/.bashrc; source ~/.bashrc
 
 
@@ -100,7 +100,7 @@ git clone https://github.com/jstmn/ColosseumV2.git
 pip install -e ColosseumV2
 ```
 
-This will install ManiSkill with the required Colosseum V2 tasks and environments.
+This will install ManiSkill with the required Colosseum V2 tasks and environments. 
 
 ## Perturbation Sets
 
@@ -115,39 +115,48 @@ Colosseum V2 supports various perturbations for robustness testing:
 | Distractor | `DISTRACTOR_OBJECT` |
 | Combined | `ALL`, `NONE` |
 
+# Evaluation
+
+The following examples demonstrate evaluation using the **MolmoAct2** model. Our framework also supports other policy architectures including:
+- **X-VLA**
+- **Pi0**
+- **Pi0.5**
+- **Pi0-Fast**
+- **SmolVLA**
+- **DiT-Policy**
+- **MolmoAct2**
+- **ACT**
+- and more...
+
+Any policy model compatible with the LeRobot framework can be evaluated on this benchmark. Note that the Pi0.5 model trained for the ColosseumV2 paper is not usable in this repository as there were several changes to the Pi0.5 model code base made during the lerobot v0.4.3 -> 0.6.0 update. To run the model from the paper, checkout the [lerobot_0.4.3](https://github.com/jstmn/lerobot_colosseum_v2/tree/lerobot_0.4.3) branch at [jstmn/lerobot_colosseum_v2](https://github.com/jstmn/lerobot_colosseum_v2) and follow the instructions in README.md.
+
+For MolmoAct2 models, we provide pre-trained checkpoints that can be directly loaded from HuggingFace:
+- Single-Arm: `jstm/molmoact2_single_arm`
+- Bimanual: `jstm/molmoact2_bimanual`
+
+For other policy architectures, users need to train their own models. 
+
 ## Single Task Evaluation
 
-Run evaluation on a single task using `lerobot-eval`:
+Run evaluation on a single task:
 
 ### Single-Arm Task
+
+Default environment:
 ```bash
 lerobot-eval \
-  --policy.path=pythonsong/pi05_single_arm \
+  --policy.path=jstm/molmoact2_single_arm \
   --env.type=maniskill \
   --env.task=RaiseCube-v1 \
   --env.episode_length=200 \
-  --eval.n_episodes=200 \
-  --eval.batch_size=100 \
-  --policy.compile_model=false \
+  --eval.n_episodes=50 \
+  --eval.batch_size=25 \
+  --policy.inference_action_mode=continuous \
   --trust_remote_code=true \
-  --output_dir=/path/to/outputs
+  --output_dir=outputs/molmoact2_single_arm__$(date +%Y-%m-%d--%H-%M-%S)
 ```
 
-### Bimanual Task
-```bash
-lerobot-eval \
-  --policy.path=pythonsong/pi05_bimanual \
-  --env.type=maniskill \
-  --env.task=DualArmPickCube-v1 \
-  --env.episode_length=214 \
-  --eval.n_episodes=200 \
-  --eval.batch_size=100 \
-  --policy.compile_model=false \
-  --trust_remote_code=true \
-  --output_dir=/path/to/outputs
-```
-
-### With Perturbation Set
+**With a perturbation set (e.g. MO_COLOR)**:
 ```bash
 lerobot-eval \
   --policy.path=pythonsong/pi05_single_arm \
@@ -159,24 +168,35 @@ lerobot-eval \
   --output_dir=/path/to/outputs
 ```
 
+
+### Bimanual Task
+```bash
+lerobot-eval \
+  --policy.path=TODO:TRAIN A MODEL \
+  --env.type=maniskill \
+  --env.task=DualArmPickCube-v1 \
+  --env.episode_length=214 \
+  --eval.n_episodes=200 \
+  --eval.batch_size=100 \
+  --policy.compile_model=false \
+  --trust_remote_code=true \
+  --output_dir=/path/to/outputs
+```
+
+**With a perturbation set (e.g. MO_COLOR)**:
+```bash
+lerobot-eval \
+  --policy.path=TODO:TRAIN A MODEL \
+  --env.type=maniskill \
+  --env.task=DualArmPickCube-v1 \
+  --env.perturbation_set=MO_COLOR \
+  --eval.n_episodes=200 \
+  --eval.batch_size=100 \
+  --output_dir=/path/to/outputs
+```
+
 ## Mass Evaluation
 
-The following examples demonstrate evaluation using the **Pi0.5 (pi05)** model. Our framework also supports other policy architectures including:
-- **X-VLA**
-- **Pi0**
-- **Pi0-Fast**
-- **SmolVLA**
-- **DiT-Policy**
-- **ACT**
-- and more...
-
-Any policy model compatible with the LeRobot framework can be evaluated on this benchmark.
-
-For Pi0.5 models, we provide pre-trained checkpoints that can be directly loaded from HuggingFace:
-- Single-Arm: `pythonsong/pi05_single_arm`
-- Bimanual: `pythonsong/pi05_bimanual`
-
-For other policy architectures, users need to train their own models.
 
 ### Single-Arm Evaluation
 ```bash
@@ -187,6 +207,14 @@ python scripts/run_mass_eval.py \
   --n_episodes 200 \
   --use_per_task_episode_length \
   --output_dir /path/to/outputs/mass_eval_single_arm
+
+python scripts/run_mass_eval.py \
+  --policy_path jstm/molmoact2_single_arm \
+  --task_type single_arm \
+  --batch_size 100 \
+  --n_episodes 200 \
+  --use_per_task_episode_length \
+  --output_dir outputs/mass_eval_single_arm_molmoact2
 ```
 
 ### Bimanual Evaluation

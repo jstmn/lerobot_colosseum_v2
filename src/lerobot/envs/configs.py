@@ -804,6 +804,27 @@ class ManiSkillEnv(EnvConfig):
             "sim_backend": self.sim_backend,
         }
 
+    def create_envs(self, n_envs: int, use_async_envs: bool = False):
+        from lerobot.envs.maniskill import create_maniskill_envs
+
+        if not self.task:
+            raise ValueError("ManiSkillEnv requires `task` to be specified.")
+
+        return create_maniskill_envs(
+            task=self.task,
+            n_envs=n_envs,
+            episode_length=self.episode_length,
+            obs_mode=self.obs_mode,
+            control_mode=self.control_mode,
+            render_mode=self.render_mode,
+            sim_backend=self.sim_backend,
+            camera_name=self.camera_name,
+            state_dim=self.state_dim,
+            observation_height=self.observation_height,
+            observation_width=self.observation_width,
+            perturbation_set=self.perturbation_set,
+            env_cls=_make_vec_env_cls(use_async_envs, n_envs),
+        )
 
 
 @EnvConfig.register_subclass("libero_plus")

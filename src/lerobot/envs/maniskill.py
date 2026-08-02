@@ -187,6 +187,9 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         super().__init__(env)
         self._task = task
         self._task_description = task_description
+        # Needed for check_env_attributes_and_types()
+        self.task = task
+        self.task_description = task_description
         self._max_episode_steps_val = max_episode_steps
         self._state_dim = state_dim
         # Multi-camera support: list of (env_cam_name, output_cam_name) tuples
