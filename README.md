@@ -23,7 +23,7 @@ This repository provides the **first native ManiSkill simulator implementation**
 
 - Native ManiSkill environment support for LeRobot training and evaluation
 - Full Colosseum V2 benchmark support with 16 single-arm and 12 bimanual tasks
-- Support for all distraction sets (texture, lighting, camera, object variations)
+- Support for all perturbation sets (texture, lighting, camera, object variations)
 - Automatic per-task episode length based on training data statistics
 - Mass evaluation script with checkpoint resumption and real-time CSV logging
 
@@ -67,6 +67,8 @@ This repository provides the **first native ManiSkill simulator implementation**
 git clone https://github.com/Geeksongs/lerobot_colosseum_v2.git
 cd lerobot_colosseum_v2
 pip install -e .
+
+pip install "transformers @ git+https://github.com/huggingface/transformers.git@fix/lerobot_openpi" # see https://github.com/huggingface/lerobot/issues/2305
 ```
 
 ### Colosseum V2 Dependencies
@@ -103,13 +105,13 @@ Run evaluation on a single task using `lerobot-eval`:
 lerobot-eval \
   --policy.path=pythonsong/pi05_single_arm \
   --env.type=maniskill \
-  --env.task=PickCube-v1 \
-  --env.episode_length=200 \
-  --eval.n_episodes=200 \
-  --eval.batch_size=100 \
+  --env.task=RaiseCube-v1 \
+  --env.episode_length=150 \
+  --eval.n_episodes=50 \
+  --eval.batch_size=50 \
   --policy.compile_model=false \
   --trust_remote_code=true \
-  --output_dir=/path/to/outputs
+  --output_dir=outputs_eval
 ```
 
 ### Bimanual Task
@@ -132,7 +134,7 @@ lerobot-eval \
   --policy.path=pythonsong/pi05_single_arm \
   --env.type=maniskill \
   --env.task=PickCube-v1 \
-  --env.distraction_set=MO_COLOR \
+  --env.perturbation_set=MO_COLOR \
   --eval.n_episodes=200 \
   --eval.batch_size=100 \
   --output_dir=/path/to/outputs
@@ -243,7 +245,7 @@ Results are saved to a CSV file with columns:
 | Column | Description |
 |--------|-------------|
 | `env_id` | Task name |
-| `distraction_set` | Perturbation type |
+| `perturbation_set` | Perturbation type |
 | `num_eval_episodes` | Total episodes |
 | `num_sucessful_episodes` | Successful episodes |
 | `success_percent` | Success rate (%) |

@@ -2,8 +2,8 @@
 """
 Mass evaluation script for LeRobot on ManiSkill Colosseum V2 tasks.
 
-This script runs evaluation across all tasks and distraction sets, with:
-- Checkpoint resumption (skips already completed task+distraction combinations)
+This script runs evaluation across all tasks and perturbation sets, with:
+- Checkpoint resumption (skips already completed task+perturbation combinations)
 - Immediate CSV saving after each evaluation
 - Error handling with failure summary at the end
 
@@ -76,8 +76,8 @@ ALL_COLOSSEUM_V2_BIMANUAL_TASKS = (
     "DualArmStack3Cube-v1",
 )
 
-# All distraction sets from ManiSkill Colosseum V2
-DISTRACTION_SETS = (
+# All perturbation sets from ManiSkill Colosseum V2
+PERTURBATION_SETS = (
     "NONE",
     "ALL",
     "DISTRACTOR_OBJECT",
@@ -102,7 +102,7 @@ CSV_COLUMNS = [
     "checkpoint_path",
     "pc_hostname",
     "now",
-    "distraction_set",
+    "perturbation_set",
     "env_id",
     "control_mode",
     "include_depth",
@@ -169,7 +169,7 @@ def get_or_create_results_csv(csv_path: str) -> pd.DataFrame:
     Automatically migrates old CSV format (10 columns) to new format (12 columns):
     - Adds pc_hostname and now columns
     - Updates message field from "results" to "results_df"
-    - Removes MO_MASS distraction set rows (no longer supported)
+    - Removes MO_MASS perturbation set rows (no longer supported)
     """
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
@@ -179,7 +179,7 @@ def get_or_create_results_csv(csv_path: str) -> pd.DataFrame:
         if current_columns != CSV_COLUMNS:
             # Old format columns for reference
             old_columns = [
-                "checkpoint_path", "distraction_set", "env_id", "control_mode",
+                "checkpoint_path", "perturbation_set", "env_id", "control_mode",
                 "include_depth", "num_eval_episodes", "max_episode_steps",
                 "message", "num_sucessful_episodes", "success_percent",
             ]
@@ -196,7 +196,7 @@ def get_or_create_results_csv(csv_path: str) -> pd.DataFrame:
 
                 # 3. Remove MO_MASS rows (no longer supported)
                 rows_before = len(df)
-                df = df[df["distraction_set"].str.upper() != "MO_MASS"]
+                df = df[df["perturbation_set"].str.upper() != "MO_MASS"]
                 rows_removed = rows_before - len(df)
                 if rows_removed > 0:
                     print(f"Removed {rows_removed} MO_MASS rows (no longer supported)")
@@ -222,11 +222,11 @@ def get_or_create_results_csv(csv_path: str) -> pd.DataFrame:
         return df
 
 
-def check_if_completed(df: pd.DataFrame, task: str, distraction_set: str) -> bool:
-    """Check if a task+distraction_set combination has already been evaluated."""
+def check_if_completed(df: pd.DataFrame, task: str, perturbation_set: str) -> bool:
+    """Check if a task+perturbation_set combination has already been evaluated."""
     result_found = df[
         (df["env_id"] == task) &
-        (df["distraction_set"].str.upper() == distraction_set.upper()) &
+        (df["perturbation_set"].str.upper() == perturbation_set.upper()) &
         (df["message"] == "results_df")  # Only consider completed results
     ]
     return len(result_found) > 0
@@ -238,7 +238,7 @@ def save_placeholder_row(
     pc_hostname: str,
     now: str,
     task: str,
-    distraction_set: str,
+    perturbation_set: str,
     control_mode: str,
     include_depth: bool,
     n_episodes: int,
@@ -250,7 +250,7 @@ def save_placeholder_row(
         "checkpoint_path": checkpoint_path,
         "pc_hostname": pc_hostname,
         "now": now,
-        "distraction_set": distraction_set.lower(),
+        "perturbation_set": perturbation_set.lower(),
         "env_id": task,
         "control_mode": control_mode,
         "include_depth": include_depth,
@@ -270,7 +270,7 @@ def save_result_row(
     pc_hostname: str,
     now: str,
     task: str,
-    distraction_set: str,
+    perturbation_set: str,
     control_mode: str,
     include_depth: bool,
     n_episodes: int,
@@ -285,7 +285,7 @@ def save_result_row(
         "checkpoint_path": checkpoint_path,
         "pc_hostname": pc_hostname,
         "now": now,
-        "distraction_set": distraction_set.lower(),
+        "perturbation_set": perturbation_set.lower(),
         "env_id": task,
         "control_mode": control_mode,
         "include_depth": include_depth,
@@ -303,7 +303,7 @@ def save_result_row(
 def run_lerobot_eval(
     policy_path: str,
     task: str,
-    distraction_set: str,
+    perturbation_set: str,
     batch_size: int,
     n_episodes: int,
     episode_length: int,
@@ -317,7 +317,7 @@ def run_lerobot_eval(
         tuple: (success, n_successful_episodes, n_total_episodes, error_message)
     """
     # Build the output path for this specific evaluation
-    eval_output_dir = Path(output_dir) / f"{task}_{distraction_set}"
+    eval_output_dir = Path(output_dir) / f"{task}_{perturbation_set}"
 
     # Build the command
     cmd = [
@@ -331,7 +331,7 @@ def run_lerobot_eval(
         "--eval.max_episodes_rendered=0",  # Disable video rendering for speed
         "--policy.compile_model=false",   # Disable torch.compile at eval (training artifact)
         "--trust_remote_code=true",
-        f"--env.distraction_set={distraction_set}",
+        f"--env.perturbation_set={perturbation_set}",
         f"--output_dir={eval_output_dir}",
     ]
 
@@ -339,7 +339,7 @@ def run_lerobot_eval(
         cmd.append(f"--rename_map={json.dumps(rename_map)}")
 
     print(f"\n{'='*60}")
-    print(f"Running: {task} with distraction_set={distraction_set}")
+    print(f"Running: {task} with perturbation_set={perturbation_set}")
     print(f"Command: {' '.join(cmd)}")
     print(f"{'='*60}\n")
 
@@ -426,7 +426,7 @@ def main():
         "--n_episodes",
         type=int,
         default=50,
-        help="Number of episodes per task+distraction combination (default: 50)",
+        help="Number of episodes per task+perturbation combination (default: 50)",
     )
     parser.add_argument(
         "--episode_length",
@@ -464,7 +464,7 @@ def main():
         type=str,
         nargs="+",
         default=None,
-        help="Specific distraction sets to evaluate (default: all 16 sets)",
+        help="Specific perturbation sets to evaluate (default: all 16 sets)",
     )
     parser.add_argument(
         "--max_episode_steps_from_lookup",
@@ -508,21 +508,21 @@ def main():
     else:
         tasks = all_tasks
 
-    # Filter distraction sets if specified
+    # Filter perturbation sets if specified
     if args.distraction_sets is not None:
-        distraction_sets = tuple(d.upper() for d in args.distraction_sets if d.upper() in DISTRACTION_SETS)
-        invalid_ds = [d for d in args.distraction_sets if d.upper() not in DISTRACTION_SETS]
+        distraction_sets = tuple(d.upper() for d in args.distraction_sets if d.upper() in PERTURBATION_SETS)
+        invalid_ds = [d for d in args.distraction_sets if d.upper() not in PERTURBATION_SETS]
         if invalid_ds:
-            print(f"Warning: Invalid distraction sets ignored: {invalid_ds}")
+            print(f"Warning: Invalid perturbation sets ignored: {invalid_ds}")
         if not distraction_sets:
-            print(f"Error: No valid distraction sets specified. Available: {DISTRACTION_SETS}")
+            print(f"Error: No valid perturbation sets specified. Available: {PERTURBATION_SETS}")
             sys.exit(1)
     else:
-        distraction_sets = DISTRACTION_SETS
+        distraction_sets = PERTURBATION_SETS
 
     # Calculate total evaluations
     total_evals = len(tasks) * len(distraction_sets)
-    print(f"\nTotal evaluations: {len(tasks)} tasks x {len(distraction_sets)} distraction sets = {total_evals}")
+    print(f"\nTotal evaluations: {len(tasks)} tasks x {len(distraction_sets)} perturbation sets = {total_evals}")
     print(f"Episodes per evaluation: {args.n_episodes}")
     print(f"Batch size: {args.batch_size}")
     print(f"Results CSV: {args.results_csv}")
@@ -542,16 +542,16 @@ def main():
     # Main evaluation loop
     eval_count = 0
     for task in tasks:
-        for distraction_set in distraction_sets:
+        for perturbation_set in distraction_sets:
             eval_count += 1
 
             # Check if already completed
-            if check_if_completed(results_df, task, distraction_set):
-                print(f"[{eval_count}/{total_evals}] Skipping {task} + {distraction_set} (already completed)")
-                skipped_tasks.append((task, distraction_set))
+            if check_if_completed(results_df, task, perturbation_set):
+                print(f"[{eval_count}/{total_evals}] Skipping {task} + {perturbation_set} (already completed)")
+                skipped_tasks.append((task, perturbation_set))
                 continue
 
-            print(f"\n[{eval_count}/{total_evals}] Starting: {task} + {distraction_set}")
+            print(f"\n[{eval_count}/{total_evals}] Starting: {task} + {perturbation_set}")
 
             # Determine episode length for this task
             if args.max_episode_steps_from_lookup:
@@ -571,7 +571,7 @@ def main():
                 pc_hostname=pc_hostname,
                 now=now,
                 task=task,
-                distraction_set=distraction_set,
+                perturbation_set=perturbation_set,
                 control_mode=control_mode,
                 include_depth=args.include_depth,
                 n_episodes=args.n_episodes,
@@ -583,7 +583,7 @@ def main():
                 success, n_successful, n_total, message = run_lerobot_eval(
                     policy_path=args.policy_path,
                     task=task,
-                    distraction_set=distraction_set,
+                    perturbation_set=perturbation_set,
                     batch_size=args.batch_size,
                     n_episodes=args.n_episodes,
                     episode_length=task_episode_length,
@@ -599,7 +599,7 @@ def main():
                         pc_hostname=pc_hostname,
                         now=now,
                         task=task,
-                        distraction_set=distraction_set,
+                        perturbation_set=perturbation_set,
                         control_mode=control_mode,
                         include_depth=args.include_depth,
                         n_episodes=args.n_episodes,
@@ -608,8 +608,8 @@ def main():
                         num_successful=n_successful,
                         success_percent=success_percent,
                     )
-                    completed_tasks.append((task, distraction_set, success_percent))
-                    print(f"Completed: {task} + {distraction_set} -> {success_percent:.2f}% success")
+                    completed_tasks.append((task, perturbation_set, success_percent))
+                    print(f"Completed: {task} + {perturbation_set} -> {success_percent:.2f}% success")
                 else:
                     # Save error result
                     save_result_row(
@@ -618,7 +618,7 @@ def main():
                         pc_hostname=pc_hostname,
                         now=now,
                         task=task,
-                        distraction_set=distraction_set,
+                        perturbation_set=perturbation_set,
                         control_mode=control_mode,
                         include_depth=args.include_depth,
                         n_episodes=args.n_episodes,
@@ -627,8 +627,8 @@ def main():
                         num_successful=-1,
                         success_percent=-1,
                     )
-                    failed_tasks.append((task, distraction_set, message))
-                    print(f"FAILED: {task} + {distraction_set} -> {message}")
+                    failed_tasks.append((task, perturbation_set, message))
+                    print(f"FAILED: {task} + {perturbation_set} -> {message}")
 
             except Exception as e:
                 # Catch-all for unexpected errors
@@ -639,7 +639,7 @@ def main():
                     pc_hostname=pc_hostname,
                     now=now,
                     task=task,
-                    distraction_set=distraction_set,
+                    perturbation_set=perturbation_set,
                     control_mode=control_mode,
                     include_depth=args.include_depth,
                     n_episodes=args.n_episodes,
@@ -648,8 +648,8 @@ def main():
                     num_successful=-1,
                     success_percent=-1,
                 )
-                failed_tasks.append((task, distraction_set, error_msg))
-                print(f"EXCEPTION: {task} + {distraction_set} -> {error_msg}")
+                failed_tasks.append((task, perturbation_set, error_msg))
+                print(f"EXCEPTION: {task} + {perturbation_set} -> {error_msg}")
                 continue
 
             # Reload results for next iteration
@@ -671,8 +671,8 @@ def main():
         print("\n" + "-" * 40)
         print("FAILED TASKS:")
         print("-" * 40)
-        for task, distraction_set, error in failed_tasks:
-            print(f"  - {task} + {distraction_set}: {error}")
+        for task, perturbation_set, error in failed_tasks:
+            print(f"  - {task} + {perturbation_set}: {error}")
 
     print(f"\nResults saved to: {args.results_csv}")
 

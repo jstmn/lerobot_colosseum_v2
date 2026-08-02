@@ -106,10 +106,10 @@ MAX_EPISODE_STEPS_BY_TASK = {
     "DualArmStack3Cube-v1":         int(242.08 + 4 * 10.5),
 }
 
-# Tasks that support distraction_set parameter (true Colosseum v2 tasks)
+# Tasks that support perturbation_set parameter (true Colosseum v2 tasks)
 # These are tasks defined in mani_skill/envs/tasks/tabletop/colosseum_v2/
 # Some tasks like StackCube-v1, LiftPegUpright-v1, PegInsertionSide-v1, PlugCharger-v1
-# are original versions that do NOT support distraction_set
+# are original versions that do NOT support perturbation_set
 COLOSSEUM_V2_TASKS = {
     # Single arm Colosseum v2 tasks
     "RaiseCube-v1",
@@ -258,7 +258,7 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         return self._convert_obs(obs), info
 
     def _randomize_language_instructions(self):
-        """Randomize language instructions per episode if LANGUAGE distraction set is active."""
+        """Randomize language instructions per episode if LANGUAGE perturbation set is active."""
         try:
             base_env = self.env.unwrapped
             if hasattr(base_env, "update_language_instructions"):
@@ -376,7 +376,7 @@ def create_maniskill_envs(
     state_dim: int = 9,
     observation_height: int = 480,
     observation_width: int = 640,
-    distraction_set: str = "NONE",
+    perturbation_set: str = "NONE",
     env_cls=None,
 ) -> Dict[str, Dict[int, gym.vector.VectorEnv]]:
     """
@@ -447,20 +447,20 @@ def create_maniskill_envs(
     # Bimanual: TBD (fall back to single base_camera for now)
     task_camera_names = None  # will be set below
 
-    # Only true Colosseum v2 tasks support distraction_set parameter
+    # Only true Colosseum v2 tasks support perturbation_set parameter
     # Some tasks like StackCube-v1, LiftPegUpright-v1, PegInsertionSide-v1, PlugCharger-v1
-    # are original versions that do NOT support distraction_set
+    # are original versions that do NOT support perturbation_set
     if task_name in COLOSSEUM_V2_TASKS:
-        from mani_skill.envs.tasks.tabletop.colosseum_v2.distraction_set import DISTRACTION_SETS
-        ds_key = distraction_set.upper()
-        if ds_key not in DISTRACTION_SETS:
+        from mani_skill.envs.tasks.tabletop.colosseum_v2.perturbation_set import PERTURBATION_SETS
+        ds_key = perturbation_set.upper()
+        if ds_key not in PERTURBATION_SETS:
             raise ValueError(
-                f"Unknown distraction_set '{distraction_set}'. "
-                f"Valid options: {list(DISTRACTION_SETS.keys())}"
+                f"Unknown perturbation_set '{perturbation_set}'. "
+                f"Valid options: {list(PERTURBATION_SETS.keys())}"
             )
-        env_kwargs["distraction_set"] = DISTRACTION_SETS[ds_key]
+        env_kwargs["perturbation_set"] = PERTURBATION_SETS[ds_key]
         env_kwargs["_env_id"] = task_name
-        print(f"  Adding distraction_set={ds_key} for Colosseum v2 task")
+        print(f"  Adding perturbation_set={ds_key} for Colosseum v2 task")
 
     if not is_bimanual_task(task_name):
         # Single arm: use all 3 cameras that match training data
