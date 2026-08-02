@@ -195,40 +195,9 @@ lerobot-eval \
   --output_dir=/path/to/outputs
 ```
 
-## Mass Evaluation
+## Full ColosseumV2 Evaluation
 
-
-### Single-Arm Evaluation
-```bash
-python scripts/run_mass_eval.py \
-  --policy_path pythonsong/pi05_single_arm \
-  --task_type single_arm \
-  --batch_size 100 \
-  --n_episodes 200 \
-  --use_per_task_episode_length \
-  --output_dir /path/to/outputs/mass_eval_single_arm
-
-python scripts/run_mass_eval.py \
-  --policy_path jstm/molmoact2_single_arm \
-  --task_type single_arm \
-  --batch_size 100 \
-  --n_episodes 200 \
-  --use_per_task_episode_length \
-  --output_dir outputs/mass_eval_single_arm_molmoact2
-```
-
-### Bimanual Evaluation
-```bash
-python scripts/run_mass_eval.py \
-  --policy_path pythonsong/pi05_bimanual \
-  --task_type bimanual \
-  --batch_size 100 \
-  --n_episodes 200 \
-  --use_per_task_episode_length \
-  --output_dir /path/to/outputs/mass_eval_bimanual
-```
-
-### Mass Evaluation Parameters
+Evaluate on all Colosseum V2 tasks and perturbation sets combinations using the `run_mass_eval.py` script.
 
 | Parameter | Description |
 |-----------|-------------|
@@ -236,14 +205,39 @@ python scripts/run_mass_eval.py \
 | `--task_type` | `single_arm` or `bimanual` |
 | `--batch_size` | Number of parallel environments |
 | `--n_episodes` | Episodes per task |
-| `--use_per_task_episode_length` | Use optimal episode length from training data |
 | `--output_dir` | Output directory for results |
+
+
+### Single-Arm
+```bash
+python scripts/run_mass_eval.py \
+  --policy_path jstm/molmoact2_single_arm \
+  --task_type single_arm \
+  --batch_size 25 \
+  --n_episodes 25 \
+  --output_dir outputs/mass_eval_single_arm_molmoact2
+```
+
+### Bimanual
+```bash
+python scripts/run_mass_eval.py \
+  --policy_path jstm/molmoact2_bimanual \
+  --task_type bimanual \
+  --batch_size 25 \
+  --n_episodes 200 \
+  --output_dir outputs/mass_eval_bimanual_molmoact2
+```
+
+
+
+
+
 
 ## Training
 
 Train your own policy model on Colosseum V2 datasets:
 
-### Single-Arm Training
+### Single-Arm
 ```bash
 
 # Pi0.5
@@ -294,7 +288,7 @@ lerobot-train \
   --save_freq=1000
 ```
 
-### Bimanual Training
+### Bimanual
 ```bash
 lerobot-train \
   --dataset.repo_id=pythonsong/colosseum-bimanual-jan27 \

@@ -28,15 +28,15 @@ import json
 import os
 import socket
 import subprocess
-import sys
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 
-from lerobot.envs.maniskill import MAX_EPISODE_STEPS_BY_TASK
-
+from mani_skill.envs.tasks.tabletop.colosseum_v2.perturbation_set import PERTURBATION_SETS as _PERTURBATION_SETS
+from mani_skill.envs.tasks.tabletop.colosseum_v2 import MAX_EPISODE_STEPS_BY_TASK
 
 # ============================================================================
 # Task Definitions
@@ -76,29 +76,31 @@ ALL_COLOSSEUM_V2_BIMANUAL_TASKS = (
     "DualArmStack3Cube-v1",
 )
 
-# All perturbation sets from ManiSkill Colosseum V2
-PERTURBATION_SETS = (
-    "NONE",
-    "ALL",
-    "DISTRACTOR_OBJECT",
-    "MO_COLOR",
-    "MO_TEXTURE",
-    "MO_SIZE",
-    "RO_COLOR",
-    "RO_TEXTURE",
-    "RO_SIZE",
-    "TABLE_COLOR",
-    "TABLE_TEXTURE",
-    "CAMERA_POSE",
-    "LIGHT_COLOR",
-    "BACKGROUND_TEXTURE",
-    "BACKGROUND_COLOR",
-    "LANGUAGE",
-    "POSE_RANDOMIZATION",
-)
+# Keys from ManiSkill Colosseum V2 perturbation_set.PERTURBATION_SETS
+PERTURBATION_SETS = tuple(_PERTURBATION_SETS.keys())
+
+COMPLETED_MESSAGES = ("results_df", "variation_factor_disabled")
 
 # CSV columns (matches ManiSkill eval_rgbd.py format)
 CSV_COLUMNS = [
+    "checkpoint_path",
+    "pc_hostname",
+    "now",
+    "t_final",
+    "duration_sec",
+    "perturbation_set",
+    "env_id",
+    "control_mode",
+    "include_depth",
+    "num_eval_episodes",
+    "max_episode_steps",
+    "message",
+    "num_sucessful_episodes",  # Note: keeping original spelling for compatibility
+    "success_percent",
+]
+
+# Previous schema before t_final / duration_sec were added
+_CSV_COLUMNS_WITHOUT_TIMING = [
     "checkpoint_path",
     "pc_hostname",
     "now",
@@ -109,7 +111,7 @@ CSV_COLUMNS = [
     "num_eval_episodes",
     "max_episode_steps",
     "message",
-    "num_sucessful_episodes",  # Note: keeping original spelling for compatibility
+    "num_sucessful_episodes",
     "success_percent",
 ]
 
@@ -163,60 +165,40 @@ def gpu_monitor(interval: float = 60.0, stop_event: threading.Event = None) -> N
 # Helper Functions
 # ============================================================================
 
+def get_now_str() -> str:
+    return datetime.now().strftime("%Y:%m:%d__%H:%M:%S")
+
+
 def get_or_create_results_csv(csv_path: str) -> pd.DataFrame:
     """Load existing CSV or create a new one with proper columns.
 
-    Automatically migrates old CSV format (10 columns) to new format (12 columns):
-    - Adds pc_hostname and now columns
-    - Updates message field from "results" to "results_df"
-    - Removes MO_MASS perturbation set rows (no longer supported)
+    Migrates the previous schema (missing t_final / duration_sec) in place.
     """
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
         current_columns = df.columns.tolist()
 
-        # Check if migration is needed (old format has 10 columns, new has 12)
-        if current_columns != CSV_COLUMNS:
-            # Old format columns for reference
-            old_columns = [
-                "checkpoint_path", "perturbation_set", "env_id", "control_mode",
-                "include_depth", "num_eval_episodes", "max_episode_steps",
-                "message", "num_sucessful_episodes", "success_percent",
-            ]
+        if current_columns == CSV_COLUMNS:
+            return df
 
-            if current_columns == old_columns:
-                print(f"Detected old CSV format. Migrating to new format...")
+        if current_columns == _CSV_COLUMNS_WITHOUT_TIMING:
+            now_idx = df.columns.get_loc("now")
+            df.insert(now_idx + 1, "t_final", "final-time-not-set")
+            df.insert(now_idx + 2, "duration_sec", -1)
+            df.to_csv(csv_path, index=False)
+            print(f"Migrated results CSV to include t_final/duration_sec: {csv_path}")
+            return df
 
-                # 1. Add pc_hostname and now columns after checkpoint_path
-                df.insert(1, "pc_hostname", "migrated")
-                df.insert(2, "now", "migrated")
-
-                # 2. Update message field: "results" -> "results_df"
-                df["message"] = df["message"].replace("results", "results_df")
-
-                # 3. Remove MO_MASS rows (no longer supported)
-                rows_before = len(df)
-                df = df[df["perturbation_set"].str.upper() != "MO_MASS"]
-                rows_removed = rows_before - len(df)
-                if rows_removed > 0:
-                    print(f"Removed {rows_removed} MO_MASS rows (no longer supported)")
-
-                # Save migrated CSV
-                df.to_csv(csv_path, index=False)
-                print(f"Migration complete. Saved to {csv_path}")
-            else:
-                raise ValueError(
-                    f"CSV columns mismatch and not recognized as old format!\n"
-                    f"Expected: {CSV_COLUMNS}\n"
-                    f"Got: {current_columns}"
-                )
-
-        return df
+        raise ValueError(
+            f"CSV columns mismatch and not recognized as a migratable format!\n"
+            f"Expected: {CSV_COLUMNS}\n"
+            f"Got: {current_columns}"
+        )
     else:
         # Create new empty DataFrame with columns
         df = pd.DataFrame(columns=CSV_COLUMNS)
         # Ensure parent directory exists
-        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+        os.makedirs(os.path.dirname(csv_path) or ".", exist_ok=True)
         df.to_csv(csv_path, index=False)
         print(f"Created new results CSV: {csv_path}")
         return df
@@ -227,9 +209,17 @@ def check_if_completed(df: pd.DataFrame, task: str, perturbation_set: str) -> bo
     result_found = df[
         (df["env_id"] == task) &
         (df["perturbation_set"].str.upper() == perturbation_set.upper()) &
-        (df["message"] == "results_df")  # Only consider completed results
+        (df["message"].isin(COMPLETED_MESSAGES))
     ]
     return len(result_found) > 0
+
+
+def _is_perturbation_factor_disabled(output: str) -> bool:
+    return (
+        "PerturbationFactorDisabledError" in output
+        or "is disabled by env" in output
+        or "Variation factor disabled error" in output
+    )
 
 
 def save_placeholder_row(
@@ -250,6 +240,8 @@ def save_placeholder_row(
         "checkpoint_path": checkpoint_path,
         "pc_hostname": pc_hostname,
         "now": now,
+        "t_final": "final-time-not-set",
+        "duration_sec": -1,
         "perturbation_set": perturbation_set.lower(),
         "env_id": task,
         "control_mode": control_mode,
@@ -269,6 +261,8 @@ def save_result_row(
     checkpoint_path: str,
     pc_hostname: str,
     now: str,
+    t_final: str,
+    duration_sec: float,
     task: str,
     perturbation_set: str,
     control_mode: str,
@@ -285,6 +279,8 @@ def save_result_row(
         "checkpoint_path": checkpoint_path,
         "pc_hostname": pc_hostname,
         "now": now,
+        "t_final": t_final,
+        "duration_sec": duration_sec,
         "perturbation_set": perturbation_set.lower(),
         "env_id": task,
         "control_mode": control_mode,
@@ -293,7 +289,7 @@ def save_result_row(
         "max_episode_steps": episode_length,
         "message": message,
         "num_sucessful_episodes": num_successful,
-        "success_percent": f"{success_percent:.2f}",
+        "success_percent": f"{success_percent:.5f}" if success_percent >= 0 else success_percent,
     }
     df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
     df.to_csv(csv_path, index=False)
@@ -314,7 +310,9 @@ def run_lerobot_eval(
     Run lerobot-eval command and parse results from eval_info.json.
 
     Returns:
-        tuple: (success, n_successful_episodes, n_total_episodes, error_message)
+        tuple: (success, n_successful_episodes, n_total_episodes, message)
+        message is "results_df" on success, "variation_factor_disabled" for soft skips,
+        or an error string on failure.
     """
     # Build the output path for this specific evaluation
     eval_output_dir = Path(output_dir) / f"{task}_{perturbation_set}"
@@ -329,11 +327,17 @@ def run_lerobot_eval(
         f"--eval.n_episodes={n_episodes}",
         f"--eval.batch_size={batch_size}",
         "--eval.max_episodes_rendered=0",  # Disable video rendering for speed
-        "--policy.compile_model=false",   # Disable torch.compile at eval (training artifact)
         "--trust_remote_code=true",
         f"--env.perturbation_set={perturbation_set}",
         f"--output_dir={eval_output_dir}",
     ]
+
+    if "pi" in policy_path.lower():
+        cmd.append("--policy.compile_model=false")   # Disable torch.compile at eval (training artifact)
+
+    # Required for MolmoAct2 rollouts (see README single-task molmoact eval).
+    if "molmoact" in policy_path.lower():
+        cmd.append("--policy.inference_action_mode=continuous")
 
     if rename_map:
         cmd.append(f"--rename_map={json.dumps(rename_map)}")
@@ -353,42 +357,59 @@ def run_lerobot_eval(
     gpu_thread.start()
 
     try:
-        # Run the command with real-time output (no capture_output)
-        result = subprocess.run(
+        # Stream output in real time while capturing it for error classification.
+        process = subprocess.Popen(
             cmd,
-            timeout=3600,  # 1 hour timeout per evaluation
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
         )
+        captured_lines: list[str] = []
+        assert process.stdout is not None
 
-        if result.returncode != 0:
-            return False, 0, n_episodes, f"Command failed with return code {result.returncode}"
+        def _stream_output() -> None:
+            for line in process.stdout:
+                print(line, end="", flush=True)
+                captured_lines.append(line)
+
+        reader = threading.Thread(target=_stream_output, daemon=True)
+        reader.start()
+        try:
+            returncode = process.wait(timeout=3600)  # 1 hour timeout per evaluation
+        except subprocess.TimeoutExpired:
+            process.kill()
+            reader.join(timeout=2.0)
+            return False, 0, n_episodes, "timeout"
+        reader.join(timeout=2.0)
+        captured = "".join(captured_lines)
+
+        if returncode != 0:
+            if _is_perturbation_factor_disabled(captured):
+                print(f"Soft-skipping {task} + {perturbation_set}: perturbation factor disabled by env")
+                return False, -1, n_episodes, "variation_factor_disabled"
+            return False, 0, n_episodes, f"Command failed with return code {returncode}"
 
         # Read results from eval_info.json
         eval_info_path = eval_output_dir / "eval_info.json"
-        if not eval_info_path.exists():
-            print(f"Warning: eval_info.json not found at {eval_info_path}")
-            return False, 0, n_episodes, "eval_info.json not found"
+        assert eval_info_path.exists(), f"eval_info.json not found at {eval_info_path}"
 
         with open(eval_info_path, "r") as f:
             eval_info = json.load(f)
 
-        # Extract success metrics from overall aggregated results
-        # The structure is: {"overall": {"pc_success": ..., ...}, "maniskill": {...}}
-        overall = eval_info.get("overall", {})
-        pc_success = overall.get("pc_success", 0.0)  # This is already a percentage (0-100)
+        assert "overall" in eval_info, (
+            f"eval_info.json missing 'overall' key at {eval_info_path}. Got keys: {list(eval_info)}"
+        )
+        overall = eval_info["overall"]
+        assert "pc_success" in overall, (
+            f"eval_info.json missing 'overall.pc_success' at {eval_info_path}. Got keys: {list(overall)}"
+        )
+        pc_success = overall["pc_success"]  # percentage in [0, 100]
 
-        # Calculate number of successful episodes
         n_successful = int(round(pc_success / 100.0 * n_episodes))
-
         print(f"Results from eval_info.json: pc_success={pc_success:.2f}%, n_successful={n_successful}/{n_episodes}")
 
         return True, n_successful, n_episodes, "results_df"
-
-    except subprocess.TimeoutExpired:
-        return False, 0, n_episodes, "timeout"
-    except json.JSONDecodeError as e:
-        return False, 0, n_episodes, f"JSON parse error: {e}"
-    except Exception as e:
-        return False, 0, n_episodes, str(e)
     finally:
         # Stop GPU monitoring thread
         stop_gpu_monitor.set()
@@ -419,20 +440,14 @@ def main():
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=1,
-        help="Number of parallel environments (default: 1)",
+        required=True,
+        help="Number of parallel environments",
     )
     parser.add_argument(
         "--n_episodes",
         type=int,
-        default=50,
-        help="Number of episodes per task+perturbation combination (default: 50)",
-    )
-    parser.add_argument(
-        "--episode_length",
-        type=int,
-        default=500,
-        help="Maximum steps per episode (default: 500)",
+        required=True,
+        help="Number of episodes per task+perturbation combination",
     )
     parser.add_argument(
         "--output_dir",
@@ -443,14 +458,12 @@ def main():
     parser.add_argument(
         "--results_csv",
         type=str,
-        default=None,
-        help="Path to results CSV file (default: output_dir/results_{task_type}.csv)",
+        help="Path to results CSV file",
     )
     parser.add_argument(
         "--include_depth",
         action="store_true",
-        default=False,
-        help="Include depth observations (default: False)",
+        help="Include depth observations",
     )
     parser.add_argument(
         "--tasks",
@@ -464,16 +477,8 @@ def main():
         type=str,
         nargs="+",
         default=None,
-        help="Specific perturbation sets to evaluate (default: all 16 sets)",
+        help=f"Specific perturbation sets to evaluate (default: all {len(PERTURBATION_SETS)} sets from PERTURBATION_SETS)",
     )
-    parser.add_argument(
-        "--max_episode_steps_from_lookup",
-        action="store_true",
-        default=False,
-        help="Use per-task episode length from MAX_EPISODE_STEPS_BY_TASK (mean+4*std of training data). "
-             "Falls back to --episode_length if task not in lookup.",
-    )
-
     args = parser.parse_args()
 
     # Set up paths
@@ -481,7 +486,8 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.results_csv is None:
-        args.results_csv = str(output_dir / f"results_{args.task_type}.csv")
+        args.results_csv = str(output_dir / f"results__{args.task_type.replace("_", "-")}__{args.policy_path.replace("/", "-")}.csv")
+    print("Saving results to: ", args.results_csv)
 
     # Select task list based on task type
     if args.task_type == "bimanual":
@@ -498,25 +504,21 @@ def main():
 
     # Filter tasks if specified
     if args.tasks is not None:
-        tasks = tuple(t for t in args.tasks if t in all_tasks)
         invalid_tasks = [t for t in args.tasks if t not in all_tasks]
-        if invalid_tasks:
-            print(f"Warning: Invalid tasks ignored: {invalid_tasks}")
-        if not tasks:
-            print(f"Error: No valid tasks specified. Available tasks: {all_tasks}")
-            sys.exit(1)
+        assert not invalid_tasks, (
+            f"Invalid tasks: {invalid_tasks}. Available tasks: {all_tasks}"
+        )
+        tasks = tuple(args.tasks)
     else:
         tasks = all_tasks
 
     # Filter perturbation sets if specified
     if args.perturbation_sets is not None:
-        perturbation_sets = tuple(d.upper() for d in args.perturbation_sets if d.upper() in PERTURBATION_SETS)
         invalid_ds = [d for d in args.perturbation_sets if d.upper() not in PERTURBATION_SETS]
-        if invalid_ds:
-            print(f"Warning: Invalid perturbation sets ignored: {invalid_ds}")
-        if not perturbation_sets:
-            print(f"Error: No valid perturbation sets specified. Available: {PERTURBATION_SETS}")
-            sys.exit(1)
+        assert not invalid_ds, (
+            f"Invalid perturbation sets: {invalid_ds}. Available: {PERTURBATION_SETS}"
+        )
+        perturbation_sets = tuple(d.upper() for d in args.perturbation_sets)
     else:
         perturbation_sets = PERTURBATION_SETS
 
@@ -532,7 +534,7 @@ def main():
 
     # Get hostname and timestamp for CSV records
     pc_hostname = socket.gethostname()
-    now = datetime.now().strftime("%Y:%m:%d__%H:%M:%S")
+    now = get_now_str()
 
     # Track failures
     failed_tasks = []
@@ -554,15 +556,21 @@ def main():
             print(f"\n[{eval_count}/{total_evals}] Starting: {task} + {perturbation_set}")
 
             # Determine episode length for this task
-            if args.max_episode_steps_from_lookup:
-                if task in MAX_EPISODE_STEPS_BY_TASK:
-                    task_episode_length = MAX_EPISODE_STEPS_BY_TASK[task]
-                    print(f"  max_episode_steps_from_lookup: {task} -> {task_episode_length} steps")
-                else:
-                    task_episode_length = args.episode_length
-                    print(f"  Warning: {task} not in MAX_EPISODE_STEPS_BY_TASK, using --episode_length={task_episode_length}")
-            else:
-                task_episode_length = args.episode_length
+            assert task in MAX_EPISODE_STEPS_BY_TASK, (
+                f"{task} not in MAX_EPISODE_STEPS_BY_TASK. "
+                f"Known tasks: {sorted(MAX_EPISODE_STEPS_BY_TASK)}"
+            )
+            task_episode_length = MAX_EPISODE_STEPS_BY_TASK[task]
+
+            # Bimanual table / ALL sets use far more GPU memory (matches eval_rgbd.py).
+            eval_batch_size = args.batch_size
+            ds_lower = perturbation_set.lower()
+            if args.task_type == "bimanual" and ("table_" in ds_lower or ds_lower == "all"):
+                eval_batch_size = max(1, args.batch_size // 4)
+                print(
+                    f"  Reducing batch size {args.batch_size} -> {eval_batch_size} "
+                    f"for bimanual + {perturbation_set}"
+                )
 
             # Save placeholder
             save_placeholder_row(
@@ -578,79 +586,83 @@ def main():
                 episode_length=task_episode_length,
             )
 
-            try:
-                # Run evaluation
-                success, n_successful, n_total, message = run_lerobot_eval(
-                    policy_path=args.policy_path,
-                    task=task,
-                    perturbation_set=perturbation_set,
-                    batch_size=args.batch_size,
-                    n_episodes=args.n_episodes,
-                    episode_length=task_episode_length,
-                    output_dir=str(output_dir),
-                    rename_map=eval_rename_map,
-                )
+            t0 = time.time()
+            success, n_successful, n_total, message = run_lerobot_eval(
+                policy_path=args.policy_path,
+                task=task,
+                perturbation_set=perturbation_set,
+                batch_size=eval_batch_size,
+                n_episodes=args.n_episodes,
+                episode_length=task_episode_length,
+                output_dir=str(output_dir),
+                rename_map=eval_rename_map,
+            )
+            t_final = get_now_str()
+            duration_sec = time.time() - t0
 
-                if success:
-                    success_percent = 100.0 * n_successful / n_total if n_total > 0 else 0.0
-                    save_result_row(
-                        csv_path=args.results_csv,
-                        checkpoint_path=args.policy_path,
-                        pc_hostname=pc_hostname,
-                        now=now,
-                        task=task,
-                        perturbation_set=perturbation_set,
-                        control_mode=control_mode,
-                        include_depth=args.include_depth,
-                        n_episodes=args.n_episodes,
-                        episode_length=args.episode_length,
-                        message=message,
-                        num_successful=n_successful,
-                        success_percent=success_percent,
-                    )
-                    completed_tasks.append((task, perturbation_set, success_percent))
-                    print(f"Completed: {task} + {perturbation_set} -> {success_percent:.2f}% success")
-                else:
-                    # Save error result
-                    save_result_row(
-                        csv_path=args.results_csv,
-                        checkpoint_path=args.policy_path,
-                        pc_hostname=pc_hostname,
-                        now=now,
-                        task=task,
-                        perturbation_set=perturbation_set,
-                        control_mode=control_mode,
-                        include_depth=args.include_depth,
-                        n_episodes=args.n_episodes,
-                        episode_length=args.episode_length,
-                        message=f"error: {message}",
-                        num_successful=-1,
-                        success_percent=-1,
-                    )
-                    failed_tasks.append((task, perturbation_set, message))
-                    print(f"FAILED: {task} + {perturbation_set} -> {message}")
-
-            except Exception as e:
-                # Catch-all for unexpected errors
-                error_msg = str(e)
+            if message == "variation_factor_disabled":
                 save_result_row(
                     csv_path=args.results_csv,
                     checkpoint_path=args.policy_path,
                     pc_hostname=pc_hostname,
                     now=now,
+                    t_final=t_final,
+                    duration_sec=duration_sec,
                     task=task,
                     perturbation_set=perturbation_set,
                     control_mode=control_mode,
                     include_depth=args.include_depth,
                     n_episodes=args.n_episodes,
-                    episode_length=args.episode_length,
-                    message=f"exception: {error_msg}",
+                    episode_length=task_episode_length,
+                    message=message,
                     num_successful=-1,
                     success_percent=-1,
                 )
-                failed_tasks.append((task, perturbation_set, error_msg))
-                print(f"EXCEPTION: {task} + {perturbation_set} -> {error_msg}")
-                continue
+                skipped_tasks.append((task, perturbation_set))
+                print(f"Soft-skipped: {task} + {perturbation_set} (perturbation factor disabled)")
+            elif success:
+                assert n_total > 0, f"n_total must be > 0, got {n_total}"
+                success_percent = 100.0 * n_successful / n_total
+                save_result_row(
+                    csv_path=args.results_csv,
+                    checkpoint_path=args.policy_path,
+                    pc_hostname=pc_hostname,
+                    now=now,
+                    t_final=t_final,
+                    duration_sec=duration_sec,
+                    task=task,
+                    perturbation_set=perturbation_set,
+                    control_mode=control_mode,
+                    include_depth=args.include_depth,
+                    n_episodes=args.n_episodes,
+                    episode_length=task_episode_length,
+                    message=message,
+                    num_successful=n_successful,
+                    success_percent=success_percent,
+                )
+                completed_tasks.append((task, perturbation_set, success_percent))
+                print(f"Completed: {task} + {perturbation_set} -> {success_percent:.2f}% success")
+            else:
+                # Explicit subprocess failure (non-zero return code / timeout) — record and continue.
+                save_result_row(
+                    csv_path=args.results_csv,
+                    checkpoint_path=args.policy_path,
+                    pc_hostname=pc_hostname,
+                    now=now,
+                    t_final=t_final,
+                    duration_sec=duration_sec,
+                    task=task,
+                    perturbation_set=perturbation_set,
+                    control_mode=control_mode,
+                    include_depth=args.include_depth,
+                    n_episodes=args.n_episodes,
+                    episode_length=task_episode_length,
+                    message=f"error: {message}",
+                    num_successful=-1,
+                    success_percent=-1,
+                )
+                failed_tasks.append((task, perturbation_set, message))
+                print(f"FAILED: {task} + {perturbation_set} -> {message}")
 
             # Reload results for next iteration
             results_df = pd.read_csv(args.results_csv)
