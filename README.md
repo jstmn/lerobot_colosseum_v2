@@ -313,6 +313,34 @@ lerobot-train \
   --policy.device=cuda \
   --batch_size=8 \
   --save_freq=1000000000
+
+# MolmoAct2
+lerobot-train \
+  --dataset.repo_id=pythonsong/colosseum-bimanual-jan27 \
+  --dataset.revision=main \
+  --policy.type=molmoact2 \
+  --policy.checkpoint_path=allenai/MolmoAct2-LIBERO \
+  --policy.action_mode=continuous \
+  --policy.train_action_expert_only=true \
+  --policy.chunk_size=10 \
+  --policy.n_action_steps=10 \
+  --policy.setup_type="two franka robotic arms in maniskill" \
+  --policy.control_mode="delta end-effector pose" \
+  --policy.image_keys='["observation.images.external1_camera","observation.images.external2_camera","observation.images.panda1_hand_camera","observation.images.panda2_hand_camera"]' \
+  --policy.device=cuda \
+  --output_dir=$LEROBOT_DATA_DIR/outputs/molmoact2_bimanual__$(date +%Y-%m-%d--%H-%M-%S) \
+  --job_name=molmoact2_training_bimanual \
+  --policy.repo_id=jstm/molmoact2_bimanual \
+  --policy.gradient_checkpointing=true \
+  --wandb.enable=true \
+  --wandb.disable_artifact=true \
+  --steps=10000 \
+  --batch_size=32 \
+  --num_workers=32 \
+  --log_freq=20 \
+  --env_eval_freq=-1 \
+  --save_checkpoint=true \
+  --save_freq=1000
 ```
 
 ## Results
