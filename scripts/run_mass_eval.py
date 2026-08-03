@@ -541,6 +541,16 @@ def main():
     skipped_tasks = []
     completed_tasks = []
 
+    # Remaining = task+perturbation combos still needing a run (excludes already-completed CSV rows).
+    remaining = sum(
+        1
+        for task in tasks
+        for perturbation_set in perturbation_sets
+        if not check_if_completed(results_df, task, perturbation_set)
+    )
+    task_durations: list[float] = []
+    print(f"Remaining evaluations to run: {remaining}")
+
     # Main evaluation loop
     eval_count = 0
     for task in tasks:
@@ -554,6 +564,15 @@ def main():
                 continue
 
             print(f"\n[{eval_count}/{total_evals}] Starting: {task} + {perturbation_set}")
+            if task_durations:
+                avg_sec = sum(task_durations) / len(task_durations)
+                eta_hours = remaining * avg_sec / 3600.0
+                print(
+                    f"  ETA: {eta_hours:.2f} hours "
+                    f"({remaining} remaining, avg {avg_sec / 60.0:.1f} min/task over {len(task_durations)} runs)"
+                )
+            else:
+                print(f"  ETA: unknown ({remaining} remaining, no completed timings yet)")
 
             # Determine episode length for this task
             assert task in MAX_EPISODE_STEPS_BY_TASK, (
@@ -599,6 +618,8 @@ def main():
             )
             t_final = get_now_str()
             duration_sec = time.time() - t0
+            task_durations.append(duration_sec)
+            remaining -= 1
 
             if message == "variation_factor_disabled":
                 save_result_row(
