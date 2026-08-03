@@ -98,6 +98,7 @@ To evaluate on Colosseum V2 benchmark, first install the Colosseum V2 repository
 ```bash
 git clone https://github.com/jstmn/ColosseumV2.git
 pip install -e ColosseumV2
+python -m ColosseumV2.mani_skill.utils.download_asset ycb
 ```
 
 This will install ManiSkill with the required Colosseum V2 tasks and environments. 
@@ -213,8 +214,8 @@ Evaluate on all Colosseum V2 tasks and perturbation sets combinations using the 
 python scripts/run_mass_eval.py \
   --policy_path jstm/molmoact2_single_arm \
   --task_type single_arm \
-  --batch_size 25 \
-  --n_episodes 25 \
+  --batch_size 50 \
+  --n_episodes 200 \
   --output_dir outputs/mass_eval_single_arm_molmoact2
 ```
 
