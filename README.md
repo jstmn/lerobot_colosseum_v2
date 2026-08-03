@@ -70,7 +70,7 @@ sudo apt install ffmpeg -y
 # 
 git clone https://github.com/Geeksongs/lerobot_colosseum_v2.git
 cd lerobot_colosseum_v2
-conda create -n lerobot_cv2 python=3.12
+conda create -n lerobot_cv2 python=3.12 pip -y
 conda activate lerobot_cv2
 pip install -e .[dataset,training]
 pip install 'numpy<2'
@@ -98,7 +98,7 @@ To evaluate on Colosseum V2 benchmark, first install the Colosseum V2 repository
 ```bash
 git clone https://github.com/jstmn/ColosseumV2.git
 pip install -e ColosseumV2
-python -m ColosseumV2.mani_skill.utils.download_asset ycb
+export MS_SKIP_ASSET_DOWNLOAD_PROMPT=1; python -m ColosseumV2.mani_skill.utils.download_asset ycb; python -m ColosseumV2.mani_skill.utils.download_asset RoboCasa
 ```
 
 This will install ManiSkill with the required Colosseum V2 tasks and environments. 
