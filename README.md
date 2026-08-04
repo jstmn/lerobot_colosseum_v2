@@ -161,21 +161,23 @@ For other policy architectures, users need to train their own models.
 
 ### Single-Arm Evaluation
 ```bash
-python scripts/run_mass_eval.py \
+python scripts/run_mass_eval_fast.py \
   --policy_path pythonsong/pi05_single_arm \
   --task_type single_arm \
   --batch_size 50 \
   --n_episodes 50 \
+  --validate_config \
   --output_dir outputs/mass_eval_single_arm_pi05
 ```
 
 ### Bimanual Evaluation
 ```bash
-python scripts/run_mass_eval.py \
+python scripts/run_mass_eval_fast.py \
   --policy_path pythonsong/pi05_bimanual \
   --task_type bimanual \
   --batch_size 100 \
   --n_episodes 100 \
+  --validate_config \
   --output_dir outputs/mass_eval_bimanual_pi05
 ```
 
