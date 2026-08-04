@@ -64,10 +64,10 @@ This repository provides the **first native ManiSkill simulator implementation**
 ## Installation
 
 ```bash
-# Apt packages
-sudo apt install ffmpeg -y
+# FFmpeg
+sudo apt install ffmpeg -y 
+# ^ or module load GCCcore/14.3.0; module load FFmpeg/7.1.2 if on a cluster
 
-# 
 git clone https://github.com/Geeksongs/lerobot_colosseum_v2.git
 cd lerobot_colosseum_v2
 conda create -n lerobot_cv2 python=3.12 pip -y
@@ -77,10 +77,6 @@ pip install 'numpy<2'
 conda install "ffmpeg" -c conda-forge
 hf auth login
 
-# Set the save directory, also consider setting WANDB_CACHE_DIR, WANDB_DATA_DIR, WANDB_DIR, WANDB_ARTIFACT_DIR, HF_HOME
-echo "export LEROBOT_DATA_DIR=\"/PATH/TO/lerobot_data\"" >> ~/.bashrc; source ~/.bashrc
-
-
 # ONLY IF YOU HAVE CUDA 12.x:
 # The plain PyPI torchcodec wheel is built for CUDA 13 and fails to load
 # ("libnvrtc.so.13 not found") with cu12x builds of torch, so install from the cu126 index:
@@ -89,13 +85,8 @@ pip install "torchcodec==0.15" --index-url https://download.pytorch.org/whl/cu12
 # If using a 5090+:
 pip uninstall torch torchvision torchaudio
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-```
 
-### Colosseum V2 Dependencies
-
-To evaluate on Colosseum V2 benchmark, first install the Colosseum V2 repository:
-
-```bash
+# Colosseum V2
 git clone https://github.com/jstmn/ColosseumV2.git
 pip install -e ColosseumV2
 export MS_SKIP_ASSET_DOWNLOAD_PROMPT=1; python -m ColosseumV2.mani_skill.utils.download_asset ycb; python -m ColosseumV2.mani_skill.utils.download_asset RoboCasa
@@ -274,7 +265,7 @@ lerobot-train \
   --policy.control_mode="delta end-effector pose" \
   --policy.image_keys='["observation.images.external1_camera","observation.images.external2_camera","observation.images.hand_camera"]' \
   --policy.device=cuda \
-  --output_dir=$LEROBOT_DATA_DIR/outputs/molmoact2_single_arm__$(date +%Y-%m-%d--%H-%M-%S) \
+  --output_dir=PATH/TO/molmoact2_single_arm__$(date +%Y-%m-%d--%H-%M-%S) \
   --job_name=molmoact2_training_single_arm \
   --policy.repo_id=jstm/molmoact2_single_arm \
   --policy.gradient_checkpointing=true \
@@ -323,7 +314,7 @@ lerobot-train \
   --policy.control_mode="delta end-effector pose" \
   --policy.image_keys='["observation.images.external1_camera","observation.images.external2_camera","observation.images.panda1_hand_camera","observation.images.panda2_hand_camera"]' \
   --policy.device=cuda \
-  --output_dir=$LEROBOT_DATA_DIR/outputs/molmoact2_bimanual__$(date +%Y-%m-%d--%H-%M-%S) \
+  --output_dir=PATH/TO/outputs/molmoact2_bimanual__$(date +%Y-%m-%d--%H-%M-%S) \
   --job_name=molmoact2_training_bimanual \
   --policy.repo_id=jstm/molmoact2_bimanual \
   --policy.gradient_checkpointing=true \
