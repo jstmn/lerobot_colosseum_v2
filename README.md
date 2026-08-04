@@ -66,9 +66,15 @@ This repository provides the **first native ManiSkill simulator implementation**
 ```bash
 git clone https://github.com/Geeksongs/lerobot_colosseum_v2.git
 cd lerobot_colosseum_v2
-pip install -e .
+conda create -n lerobot_pi05 python=3.12 pip -y
+conda activate lerobot_pi05
+pip install -e .[dataset,training]
 
+conda install "ffmpeg" -c conda-forge
+pip install 'numpy<2'
 pip install "transformers @ git+https://github.com/huggingface/transformers.git@fix/lerobot_openpi" # see https://github.com/huggingface/lerobot/issues/2305
+
+hf auth login
 ```
 
 ### Colosseum V2 Dependencies
@@ -77,8 +83,7 @@ To evaluate on Colosseum V2 benchmark, first install the Colosseum V2 repository
 
 ```bash
 git clone https://github.com/jstmn/ColosseumV2.git
-cd ColosseumV2
-pip install -e .
+pip install -e ColosseumV2/
 ```
 
 This will install ManiSkill with the required Colosseum V2 tasks and environments.
@@ -175,8 +180,8 @@ python scripts/run_mass_eval_fast.py \
 python scripts/run_mass_eval_fast.py \
   --policy_path pythonsong/pi05_bimanual \
   --task_type bimanual \
-  --batch_size 100 \
-  --n_episodes 100 \
+  --batch_size 50 \
+  --n_episodes 50 \
   --validate_config \
   --output_dir outputs/mass_eval_bimanual_pi05
 ```
