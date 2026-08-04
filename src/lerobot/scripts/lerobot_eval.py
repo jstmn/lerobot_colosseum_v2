@@ -527,6 +527,7 @@ def eval_main(cfg: EvalPipelineConfig):
 
     logging.info(colored("Output dir:", "yellow", attrs=["bold"]) + f" {cfg.output_dir}")
 
+    t0 = time.time()
     logging.info("Making environment.")
     envs = make_env(
         cfg.env,
@@ -534,16 +535,17 @@ def eval_main(cfg: EvalPipelineConfig):
         use_async_envs=cfg.eval.use_async_envs,
         trust_remote_code=cfg.trust_remote_code,
     )
+    logging.info(f"Time taken to make environment: {time.time() - t0} seconds")
 
     logging.info("Making policy.")
-
+    t1 = time.time()
     policy = make_policy(
         cfg=cfg.policy,
         env_cfg=cfg.env,
         rename_map=cfg.rename_map,
     )
-
     policy.eval()
+    logging.info(f"Time taken to make policy: {time.time() - t1} seconds")
 
     # The inference device is automatically set to match the detected hardware, overriding any previous device settings from training to ensure compatibility.
     preprocessor_overrides = {
