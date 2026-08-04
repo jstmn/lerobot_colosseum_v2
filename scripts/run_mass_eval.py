@@ -35,45 +35,8 @@ from pathlib import Path
 
 import pandas as pd
 
-# from mani_skill.envs.tasks.tabletop.colosseum_v2.perturbation_set import PERTURBATION_SETS as _PERTURBATION_SETS
-from mani_skill.envs.tasks.tabletop.colosseum_v2.perturbation_set import all_distractor_set
+from mani_skill.envs.tasks.tabletop.colosseum_v2.perturbation_set import PERTURBATION_SETS as _PERTURBATION_SETS
 from mani_skill.envs.tasks.tabletop.colosseum_v2 import MAX_EPISODE_STEPS_BY_TASK
-
-
-# Temporary hack: we only need to revaluate 'all' and 'language_X' sets
-_PERTURBATION_SETS = {
-    # "none".upper(): PerturbationSet(),
-    "all".upper(): all_distractor_set,
-    ### Distractor object
-    # "distractor_object".upper(): all_distractor_set.get_partial_copy(["distractor_object_cfg"]),
-    # ### MO
-    # "MO_color".upper(): all_distractor_set.get_partial_copy(["MO_color_cfg"]),
-    # "MO_texture".upper(): all_distractor_set.get_partial_copy(["MO_texture_cfg"]),
-    # "MO_size".upper(): all_distractor_set.get_partial_copy(["MO_size_cfg"]),
-    # # "MO_mass".upper(): all_distractor_set.get_partial_copy(["MO_mass_cfg"]),
-    # # ^ mass is ignored
-    # ### RO
-    # "RO_color".upper(): all_distractor_set.get_partial_copy(["RO_color_cfg"]),
-    # "RO_texture".upper(): all_distractor_set.get_partial_copy(["RO_texture_cfg"]),
-    # "RO_size".upper(): all_distractor_set.get_partial_copy(["RO_size_cfg"]),
-    # # ### Table
-    # "table_color".upper(): all_distractor_set.get_partial_copy(["table_color_cfg"]),
-    # "table_texture".upper(): all_distractor_set.get_partial_copy(["table_texture_cfg"]),
-    # ### Camera
-    # "camera_pose".upper(): all_distractor_set.get_partial_copy(["camera_pose_cfg"]),
-    # ### Light
-    # "light_color".upper(): all_distractor_set.get_partial_copy(["light_color_cfg"]),
-    # ### Background
-    # "background_texture".upper(): all_distractor_set.get_partial_copy(["background_texture_cfg"]),
-    # "background_color".upper(): all_distractor_set.get_partial_copy(["background_color_cfg"]),
-    ### Language (ALL enables all four; update_language_instructions samples among enabled modes)
-    "language_paraphrase".upper(): all_distractor_set.get_partial_copy(["language_paraphrase_cfg"]),
-    "language_other_task".upper(): all_distractor_set.get_partial_copy(["language_other_task_cfg"]),
-    "language_random".upper(): all_distractor_set.get_partial_copy(["language_random_cfg"]),
-    "language_none".upper(): all_distractor_set.get_partial_copy(["language_none_cfg"]),
-    ### Pose randomization
-    # "pose_randomization".upper(): all_distractor_set.get_partial_copy(["pose_randomization_cfg"]),
-}
 
 
 
