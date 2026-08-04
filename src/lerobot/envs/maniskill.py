@@ -33,23 +33,25 @@ import mani_skill.envs
 
 # Single Arm Tasks (16 tasks) - Colosseum v2 benchmark
 # Format: env_id -> (task_index, language_description)
+# Note: four tasks have ColosseumV2 env IDs (used by mass eval / COLOSSEUM_V2_TASKS).
+# Keep the original ManiSkill IDs as aliases with the same task_index.
 SINGLE_ARM_TASK_MAPPING = {
     "CookItemInPan-v1":         (0,  "Cook the item in the pan"),
     "HammerNail-v1":            (1,  "Hammer the nail into the surface"),
-    "LiftPegUpright-v1":        (2,  "Lift the peg upright"),
+    "LiftPegUprightColosseumV2-v1": (2,  "Lift the peg upright"),
     "OpenCabinet-v1":           (3,  "Open the cabinet door"),
     "OpenDrawer-v1":            (4,  "Open the drawer"),
-    "PegInsertionSide-v1":      (5,  "Insert the peg from the side"),
+    "PegInsertionSideColosseumV2-v1": (5,  "Insert the peg from the side"),
     "PickDishFromRack-v1":      (6,  "Pick up the dish from the rack"),
     "PickSodaFromCabinet-v1":   (7,  "Pick up the soda can from the cabinet"),
     "PlaceBookInShelf-v1":      (8,  "Place the book on the shelf"),
     "PlaceCubeInDrawer-v1":     (9,  "Place the cube in the drawer"),
     "PlaceDishInRack-v1":       (10, "Place the dish in the rack"),
-    "PlugCharger-v1":           (11, "Plug in the charger"),
+    "PlugChargerColosseumV2-v1": (11, "Plug in the charger"),
     "RaiseCube-v1":             (12, "Raise the cube up from the table"),
     "RotateArrow-v1":           (13, "Rotate the arrow"),
     "ScoopBanana-v1":           (14, "Scoop the banana"),
-    "StackCube-v1":             (15, "Stack one cube on top of another"),
+    "StackCubeColosseumV2-v1":  (15, "Stack one cube on top of another"),
 }
 
 # Bimanual Tasks (12 tasks) - Dual arm manipulation
