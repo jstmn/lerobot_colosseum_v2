@@ -335,9 +335,19 @@ def run_lerobot_eval(
     if "pi" in policy_path.lower():
         cmd.append("--policy.compile_model=false")   # Disable torch.compile at eval (training artifact)
 
-    # Required for MolmoAct2 rollouts (see README single-task molmoact eval).
+    # Required for MolmoAct2 rollouts (see README / HF molmoact2 eval docs).
+    # Note: do NOT set use_amp=true here — lerobot-eval wraps the whole rollout in
+    # torch.autocast (fp16), and ManiSkill IK then fails with Float vs Half in linalg.solve.
+    # MolmoAct2 already autocasts internally via model_dtype=bfloat16 and returns float32 actions.
     if "molmoact" in policy_path.lower():
-        cmd.append("--policy.inference_action_mode=continuous")
+        cmd.extend(
+            [
+                "--policy.inference_action_mode=continuous",
+                "--policy.model_dtype=bfloat16",
+                "--policy.enable_inference_cuda_graph=true",
+                "--policy.device=cuda",
+            ]
+        )
 
     if rename_map:
         cmd.append(f"--rename_map={json.dumps(rename_map)}")
