@@ -89,7 +89,7 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 # Colosseum V2
 git clone https://github.com/jstmn/ColosseumV2.git
 pip install -e ColosseumV2
-export MS_SKIP_ASSET_DOWNLOAD_PROMPT=1; python -m ColosseumV2.mani_skill.utils.download_asset ycb; python -m ColosseumV2.mani_skill.utils.download_asset RoboCasa
+export MS_SKIP_ASSET_DOWNLOAD_PROMPT=1; python -m ColosseumV2.mani_skill.utils.download_asset ycb; python -m ColosseumV2.mani_skill.utils.download_asset RoboCasa; python -m ColosseumV2.mani_skill.utils.download_asset partnet_mobility
 ```
 
 This will install ManiSkill with the required Colosseum V2 tasks and environments. 
@@ -202,21 +202,23 @@ Evaluate on all Colosseum V2 tasks and perturbation sets combinations using the 
 
 ### Single-Arm
 ```bash
+# export CUDA_VISIBLE_DEVICES=0
 python scripts/run_mass_eval.py \
   --policy_path jstm/molmoact2_single_arm \
   --task_type single_arm \
-  --batch_size 50 \
-  --n_episodes 200 \
+  --batch_size 25 \
+  --n_episodes 50 \
   --output_dir outputs/mass_eval_single_arm_molmoact2
 ```
 
 ### Bimanual
 ```bash
+# export CUDA_VISIBLE_DEVICES=1
 python scripts/run_mass_eval.py \
   --policy_path jstm/molmoact2_bimanual \
   --task_type bimanual \
   --batch_size 25 \
-  --n_episodes 200 \
+  --n_episodes 50 \
   --output_dir outputs/mass_eval_bimanual_molmoact2
 ```
 
