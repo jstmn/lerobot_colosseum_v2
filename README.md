@@ -203,20 +203,23 @@ Evaluate on all Colosseum V2 tasks and perturbation sets combinations using the 
 ### Single-Arm
 ```bash
 # export CUDA_VISIBLE_DEVICES=0
-python scripts/run_mass_eval.py \
+python scripts/run_mass_eval_fast.py \
   --policy_path jstm/molmoact2_single_arm \
   --task_type single_arm \
   --batch_size 25 \
   --n_episodes 50 \
-  --output_dir outputs/mass_eval_single_arm_molmoact2
+  --output_dir outputs/mass_eval_single_arm_molmoact2 \
+  --validate_config
+
 ```
 
 ### Bimanual
 ```bash
 # export CUDA_VISIBLE_DEVICES=1
-python scripts/run_mass_eval.py \
+python scripts/run_mass_eval_fast.py \
   --policy_path jstm/molmoact2_bimanual \
   --task_type bimanual \
+  --validate_config \
   --batch_size 25 \
   --n_episodes 50 \
   --output_dir outputs/mass_eval_bimanual_molmoact2

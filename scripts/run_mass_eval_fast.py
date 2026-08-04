@@ -2,20 +2,22 @@
 """
 Mass evaluation script for LeRobot on ManiSkill Colosseum V2 tasks.
 
-This script runs evaluation across all tasks and perturbation sets, with:
+This script runs evaluation across all tasks and perturbation sets in one process, with:
+- One-time policy and policy-processor initialization
+- A fresh environment for every task+perturbation combination
 - Checkpoint resumption (skips already completed task+perturbation combinations)
 - Immediate CSV saving after each evaluation
 - Error handling with failure summary at the end
 
 Usage:
-    python scripts/run_mass_eval.py \
+    python scripts/run_mass_eval_fast.py \
         --policy_path pythonsong/pi05_bimanual \
         --task_type bimanual \
         --batch_size 25 \
         --n_episodes 50 \
         --output_dir /path/to/outputs
 
-    python scripts/run_mass_eval.py \
+    python scripts/run_mass_eval_fast.py \
         --policy_path pythonsong/pi05_single_arm \
         --task_type single_arm \
         --batch_size 25 \
@@ -27,16 +29,32 @@ import argparse
 import json
 import os
 import socket
-import subprocess
-import threading
+import sys
 import time
+import traceback
+from contextlib import nullcontext
+from dataclasses import asdict, is_dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 
+import draccus
 import pandas as pd
-
-from mani_skill.envs.tasks.tabletop.colosseum_v2.perturbation_set import PERTURBATION_SETS as _PERTURBATION_SETS
+import torch
 from mani_skill.envs.tasks.tabletop.colosseum_v2 import MAX_EPISODE_STEPS_BY_TASK
+from mani_skill.envs.tasks.tabletop.colosseum_v2.perturbation_set import PERTURBATION_SETS as _PERTURBATION_SETS
+
+from lerobot.configs import parser as lerobot_parser
+from lerobot.configs.eval import EvalPipelineConfig
+from lerobot.configs.policies import PreTrainedConfig
+from lerobot.envs import close_envs, make_env, make_env_pre_post_processors
+from lerobot.envs.configs import ManiSkillEnv
+from lerobot.policies import make_policy, make_pre_post_processors
+from lerobot.scripts.lerobot_eval import eval_policy_all
+from lerobot.utils.device_utils import get_safe_torch_device
+from lerobot.utils.import_utils import register_third_party_plugins
+from lerobot.utils.random_utils import set_seed
+from lerobot.utils.utils import init_logging
 
 # ============================================================================
 # Task Definitions
@@ -114,51 +132,6 @@ _CSV_COLUMNS_WITHOUT_TIMING = [
     "num_sucessful_episodes",
     "success_percent",
 ]
-
-
-# ============================================================================
-# GPU Monitoring
-# ============================================================================
-
-def gpu_monitor(interval: float = 60.0, stop_event: threading.Event = None) -> None:
-    """Background thread to periodically print GPU usage via nvidia-smi.
-
-    This monitors actual GPU utilization and memory usage across all processes,
-    including subprocess (lerobot-eval).
-
-    Args:
-        interval: Time between prints in seconds (default: 60s = 1 minute)
-        stop_event: Threading event to signal when to stop monitoring
-    """
-    while not stop_event.is_set():
-        try:
-            # Use nvidia-smi to get GPU stats (works for all processes)
-            result = subprocess.run(
-                [
-                    "nvidia-smi",
-                    "--query-gpu=index,utilization.gpu,memory.used,memory.total,temperature.gpu",
-                    "--format=csv,noheader,nounits",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if result.returncode == 0:
-                for line in result.stdout.strip().split("\n"):
-                    parts = [p.strip() for p in line.split(",")]
-                    if len(parts) >= 5:
-                        gpu_idx, util, mem_used, mem_total, temp = parts[:5]
-                        print(f"[GPU {gpu_idx}] Util: {util}% | Memory: {mem_used}/{mem_total} MB | Temp: {temp}°C")
-            else:
-                print(f"[GPU Monitor] nvidia-smi error: {result.stderr}")
-        except FileNotFoundError:
-            print("[GPU Monitor] nvidia-smi not found, skipping GPU monitoring")
-            return
-        except Exception as e:
-            print(f"[GPU Monitor] Error: {e}")
-
-        # Wait for interval or until stop event is set
-        stop_event.wait(timeout=interval)
 
 
 # ============================================================================
@@ -296,51 +269,83 @@ def save_result_row(
     print(f"Saved results to {csv_path}")
 
 
-def run_lerobot_eval(
-    policy_path: str,
+def make_maniskill_config(
     task: str,
     perturbation_set: str,
+    episode_length: int,
+    control_mode: str,
+) -> ManiSkillEnv:
+    """Build the configuration used to create one evaluation environment."""
+    return ManiSkillEnv(
+        task=task,
+        episode_length=episode_length,
+        control_mode=control_mode,
+        perturbation_set=perturbation_set,
+    )
+
+
+def _normalize_config(value):
+    """Convert config values into stable, directly comparable Python values."""
+    if is_dataclass(value):
+        value = asdict(value)
+    if isinstance(value, dict):
+        return {str(key): _normalize_config(item) for key, item in sorted(value.items())}
+    if isinstance(value, (list, tuple)):
+        return [_normalize_config(item) for item in value]
+    if isinstance(value, (Path, Enum)):
+        return str(value.value if isinstance(value, Enum) else value)
+    return value
+
+
+def _config_differences(expected, actual, path: str) -> list[str]:
+    """Return field-level differences between two normalized configurations."""
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        differences = []
+        for key in sorted(expected.keys() | actual.keys()):
+            child_path = f"{path}.{key}"
+            if key not in expected:
+                differences.append(f"{child_path}: only in fast config ({actual[key]!r})")
+            elif key not in actual:
+                differences.append(f"{child_path}: missing from fast config (expected {expected[key]!r})")
+            else:
+                differences.extend(_config_differences(expected[key], actual[key], child_path))
+        return differences
+    if expected != actual:
+        return [f"{path}: subprocess={expected!r}, fast={actual!r}"]
+    return []
+
+
+def validate_against_subprocess_config(
+    *,
+    policy_path: str,
+    fast_policy_cfg: PreTrainedConfig,
+    fast_env_cfg: ManiSkillEnv,
+    task: str,
+    perturbation_set: str,
+    episode_length: int,
     batch_size: int,
     n_episodes: int,
-    episode_length: int,
     output_dir: str,
-    rename_map: dict = None,
-) -> tuple[bool, int, int, str]:
-    """
-    Run lerobot-eval command and parse results from eval_info.json.
-
-    Returns:
-        tuple: (success, n_successful_episodes, n_total_episodes, message)
-        message is "results_df" on success, "variation_factor_disabled" for soft skips,
-        or an error string on failure.
-    """
-    # Build the output path for this specific evaluation
-    eval_output_dir = Path(output_dir) / f"{task}_{perturbation_set}"
-
-    # Build the command
-    cmd = [
-        "lerobot-eval",
+    rename_map: dict[str, str] | None,
+) -> None:
+    """Parse the original lerobot-eval CLI and compare its effective configs."""
+    reference_args = [
         f"--policy.path={policy_path}",
         "--env.type=maniskill",
         f"--env.task={task}",
         f"--env.episode_length={episode_length}",
         f"--eval.n_episodes={n_episodes}",
         f"--eval.batch_size={batch_size}",
-        "--eval.max_episodes_rendered=0",  # Disable video rendering for speed
+        "--eval.max_episodes_rendered=0",
         "--trust_remote_code=true",
         f"--env.perturbation_set={perturbation_set}",
-        f"--output_dir={eval_output_dir}",
+        f"--output_dir={output_dir}",
     ]
-
-    if "pi" in policy_path.lower():
-        cmd.append("--policy.compile_model=false")   # Disable torch.compile at eval (training artifact)
-
-    # Required for MolmoAct2 rollouts (see README / HF molmoact2 eval docs).
-    # Note: do NOT set use_amp=true here — lerobot-eval wraps the whole rollout in
-    # torch.autocast (fp16), and ManiSkill IK then fails with Float vs Half in linalg.solve.
-    # MolmoAct2 already autocasts internally via model_dtype=bfloat16 and returns float32 actions.
-    if "molmoact" in policy_path.lower():
-        cmd.extend(
+    policy_path_lower = policy_path.lower()
+    if "pi" in policy_path_lower:
+        reference_args.append("--policy.compile_model=false")
+    if "molmoact" in policy_path_lower:
+        reference_args.extend(
             [
                 "--policy.inference_action_mode=continuous",
                 "--policy.model_dtype=bfloat16",
@@ -348,82 +353,156 @@ def run_lerobot_eval(
                 "--policy.device=cuda",
             ]
         )
-
     if rename_map:
-        cmd.append(f"--rename_map={json.dumps(rename_map)}")
+        reference_args.append(f"--rename_map={json.dumps(rename_map)}")
 
+    filtered_args = lerobot_parser.filter_path_args(
+        EvalPipelineConfig.__get_path_fields__(),
+        reference_args,
+    )
+    original_argv = sys.argv
+    try:
+        # EvalPipelineConfig.__post_init__ reads policy.path and policy overrides
+        # from sys.argv, exactly as the lerobot-eval subprocess does.
+        sys.argv = ["lerobot-eval", *reference_args]
+        reference_cfg = draccus.parse(EvalPipelineConfig, args=filtered_args)
+    finally:
+        sys.argv = original_argv
+
+    differences = [
+        *_config_differences(
+            _normalize_config(reference_cfg.env),
+            _normalize_config(fast_env_cfg),
+            "env",
+        ),
+        *_config_differences(
+            _normalize_config(reference_cfg.policy),
+            _normalize_config(fast_policy_cfg),
+            "policy",
+        ),
+    ]
+    if differences:
+        formatted = "\n  - ".join(differences)
+        raise AssertionError(f"Fast/subprocess config mismatch:\n  - {formatted}")
+    print("CONFIG VALIDATION PASSED: policy and environment configs exactly match lerobot-eval.")
+
+
+def load_policy_once(
+    policy_path: str,
+    env_cfg: ManiSkillEnv,
+    rename_map: dict[str, str] | None = None,
+):
+    """Load the policy and its processors once for the entire mass-eval run."""
+    policy_overrides: list[str] = []
+    policy_path_lower = policy_path.lower()
+    if "pi" in policy_path_lower:
+        policy_overrides.append("--compile_model=false")
+    if "molmoact" in policy_path_lower:
+        policy_overrides.extend(
+            [
+                "--inference_action_mode=continuous",
+                "--model_dtype=bfloat16",
+                "--enable_inference_cuda_graph=true",
+                "--device=cuda",
+            ]
+        )
+
+    print(f"\nLoading policy once from {policy_path}...")
+    policy_cfg = PreTrainedConfig.from_pretrained(policy_path, cli_overrides=policy_overrides)
+    policy_cfg.pretrained_path = Path(policy_path)
+    policy = make_policy(cfg=policy_cfg, env_cfg=env_cfg, rename_map=rename_map)
+    policy.eval()
+
+    preprocessor_overrides = {
+        "device_processor": {"device": str(policy.config.device)},
+        "rename_observations_processor": {"rename_map": rename_map or {}},
+    }
+    preprocessor, postprocessor = make_pre_post_processors(
+        policy_cfg=policy_cfg,
+        pretrained_path=str(policy_cfg.pretrained_path),
+        preprocessor_overrides=preprocessor_overrides,
+    )
+    device = get_safe_torch_device(policy_cfg.device, log=True)
+    print("Policy and processors loaded; they will be reused for all evaluations.")
+    return policy_cfg, policy, preprocessor, postprocessor, device
+
+
+def run_lerobot_eval(
+    *,
+    policy_cfg: PreTrainedConfig,
+    policy,
+    preprocessor,
+    postprocessor,
+    device: torch.device,
+    env_cfg: ManiSkillEnv,
+    task: str,
+    perturbation_set: str,
+    batch_size: int,
+    n_episodes: int,
+    output_dir: str,
+) -> tuple[bool, int, int, str]:
+    """Evaluate one fresh environment using the already-loaded policy."""
+    eval_output_dir = Path(output_dir) / f"{task}_{perturbation_set}"
     print(f"\n{'='*60}")
     print(f"Running: {task} with perturbation_set={perturbation_set}")
-    print(f"Command: {' '.join(cmd)}")
+    print(f"Creating {batch_size} fresh environment(s)")
     print(f"{'='*60}\n")
 
-    # Start GPU monitoring thread
-    stop_gpu_monitor = threading.Event()
-    gpu_thread = threading.Thread(
-        target=gpu_monitor,
-        args=(60.0, stop_gpu_monitor),  # 60 seconds = 1 minute interval
-        daemon=True,
-    )
-    gpu_thread.start()
-
+    envs = None
     try:
-        # Stream output in real time while capturing it for error classification.
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
+        # A normal lerobot-eval invocation starts with fresh processor state.
+        # Reset stateful steps while keeping their loaded configuration in memory.
+        preprocessor.reset()
+        postprocessor.reset()
+        envs = make_env(
+            env_cfg,
+            n_envs=batch_size,
+            use_async_envs=True,
+            trust_remote_code=True,
         )
-        captured_lines: list[str] = []
-        assert process.stdout is not None
-
-        def _stream_output() -> None:
-            for line in process.stdout:
-                print(line, end="", flush=True)
-                captured_lines.append(line)
-
-        reader = threading.Thread(target=_stream_output, daemon=True)
-        reader.start()
-        try:
-            returncode = process.wait(timeout=3600)  # 1 hour timeout per evaluation
-        except subprocess.TimeoutExpired:
-            process.kill()
-            reader.join(timeout=2.0)
-            return False, 0, n_episodes, "timeout"
-        reader.join(timeout=2.0)
-        captured = "".join(captured_lines)
-
-        if returncode != 0:
-            if _is_perturbation_factor_disabled(captured):
-                print(f"Soft-skipping {task} + {perturbation_set}: perturbation factor disabled by env")
-                return False, -1, n_episodes, "variation_factor_disabled"
-            return False, 0, n_episodes, f"Command failed with return code {returncode}"
-
-        # Read results from eval_info.json
-        eval_info_path = eval_output_dir / "eval_info.json"
-        assert eval_info_path.exists(), f"eval_info.json not found at {eval_info_path}"
-
-        with open(eval_info_path, "r") as f:
-            eval_info = json.load(f)
-
-        assert "overall" in eval_info, (
-            f"eval_info.json missing 'overall' key at {eval_info_path}. Got keys: {list(eval_info)}"
+        env_preprocessor, env_postprocessor = make_env_pre_post_processors(
+            env_cfg=env_cfg,
+            policy_cfg=policy_cfg,
         )
-        overall = eval_info["overall"]
-        assert "pc_success" in overall, (
-            f"eval_info.json missing 'overall.pc_success' at {eval_info_path}. Got keys: {list(overall)}"
-        )
-        pc_success = overall["pc_success"]  # percentage in [0, 100]
 
+        autocast_context = (
+            torch.autocast(device_type=device.type) if policy_cfg.use_amp else nullcontext()
+        )
+        with torch.no_grad(), autocast_context:
+            eval_info = eval_policy_all(
+                envs=envs,
+                policy=policy,
+                env_preprocessor=env_preprocessor,
+                env_postprocessor=env_postprocessor,
+                preprocessor=preprocessor,
+                postprocessor=postprocessor,
+                n_episodes=n_episodes,
+                max_episodes_rendered=0,
+                return_episode_data=False,
+                start_seed=1000,
+                max_parallel_tasks=env_cfg.max_parallel_tasks,
+            )
+
+        eval_output_dir.mkdir(parents=True, exist_ok=True)
+        with open(eval_output_dir / "eval_info.json", "w") as f:
+            json.dump(eval_info, f, indent=2)
+
+        pc_success = eval_info["overall"]["pc_success"]
         n_successful = int(round(pc_success / 100.0 * n_episodes))
         print(f"Results from eval_info.json: pc_success={pc_success:.2f}%, n_successful={n_successful}/{n_episodes}")
-
         return True, n_successful, n_episodes, "results_df"
+    except KeyboardInterrupt:
+        raise
+    except Exception as exc:
+        error_output = traceback.format_exc()
+        print(error_output, flush=True)
+        if _is_perturbation_factor_disabled(error_output):
+            print(f"Soft-skipping {task} + {perturbation_set}: perturbation factor disabled by env")
+            return False, -1, n_episodes, "variation_factor_disabled"
+        return False, 0, n_episodes, f"{type(exc).__name__}: {exc}"
     finally:
-        # Stop GPU monitoring thread
-        stop_gpu_monitor.set()
-        gpu_thread.join(timeout=2.0)
+        if envs is not None:
+            close_envs(envs)
 
 
 # ============================================================================
@@ -489,7 +568,17 @@ def main():
         default=None,
         help=f"Specific perturbation sets to evaluate (default: all {len(PERTURBATION_SETS)} sets from PERTURBATION_SETS)",
     )
+    parser.add_argument(
+        "--validate_config",
+        action="store_true",
+        help="One-time check that effective policy/env configs match run_mass_eval.py",
+    )
     args = parser.parse_args()
+    init_logging()
+    register_third_party_plugins()
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cuda.matmul.allow_tf32 = True
+    set_seed(1000)
 
     # Set up paths
     output_dir = Path(args.output_dir)
@@ -561,6 +650,48 @@ def main():
     task_durations: list[float] = []
     print(f"Remaining evaluations to run: {remaining}")
 
+    if remaining:
+        # All tasks selected by one invocation have the same observation/action
+        # feature layout, so any pending combination is sufficient for policy setup.
+        first_task, first_perturbation_set = next(
+            (task, perturbation_set)
+            for task in tasks
+            for perturbation_set in perturbation_sets
+            if not check_if_completed(results_df, task, perturbation_set)
+        )
+        first_episode_length = MAX_EPISODE_STEPS_BY_TASK[first_task]
+        first_env_cfg = make_maniskill_config(
+            task=first_task,
+            perturbation_set=first_perturbation_set,
+            episode_length=first_episode_length,
+            control_mode=control_mode,
+        )
+
+        policy_cfg, policy, preprocessor, postprocessor, device = load_policy_once(
+            policy_path=args.policy_path,
+            env_cfg=first_env_cfg,
+            rename_map=eval_rename_map,
+        )
+        if args.validate_config:
+            first_eval_batch_size = args.batch_size
+            first_ds_lower = first_perturbation_set.lower()
+            if args.task_type == "bimanual" and (
+                "table_" in first_ds_lower or first_ds_lower == "all"
+            ):
+                first_eval_batch_size = max(1, args.batch_size // 4)
+            validate_against_subprocess_config(
+                policy_path=args.policy_path,
+                fast_policy_cfg=policy_cfg,
+                fast_env_cfg=first_env_cfg,
+                task=first_task,
+                perturbation_set=first_perturbation_set,
+                episode_length=first_episode_length,
+                batch_size=first_eval_batch_size,
+                n_episodes=args.n_episodes,
+                output_dir=str(output_dir / f"{first_task}_{first_perturbation_set}"),
+                rename_map=eval_rename_map,
+            )
+
     # Main evaluation loop
     eval_count = 0
     for task in tasks:
@@ -593,7 +724,7 @@ def main():
 
             # Bimanual table / ALL sets use far more GPU memory (matches eval_rgbd.py).
             eval_batch_size = args.batch_size
-            # ds_lower = perturbation_set.lower()
+            ds_lower = perturbation_set.lower()
             # if args.task_type == "bimanual" and ("table_" in ds_lower or ds_lower == "all"):
             #     eval_batch_size = max(1, args.batch_size // 4)
             #     print(
@@ -616,15 +747,24 @@ def main():
             )
 
             t0 = time.time()
+            env_cfg = make_maniskill_config(
+                task=task,
+                perturbation_set=perturbation_set,
+                episode_length=task_episode_length,
+                control_mode=control_mode,
+            )
             success, n_successful, n_total, message = run_lerobot_eval(
-                policy_path=args.policy_path,
+                policy_cfg=policy_cfg,
+                policy=policy,
+                preprocessor=preprocessor,
+                postprocessor=postprocessor,
+                device=device,
+                env_cfg=env_cfg,
                 task=task,
                 perturbation_set=perturbation_set,
                 batch_size=eval_batch_size,
                 n_episodes=args.n_episodes,
-                episode_length=task_episode_length,
                 output_dir=str(output_dir),
-                rename_map=eval_rename_map,
             )
             t_final = get_now_str()
             duration_sec = time.time() - t0
@@ -674,7 +814,7 @@ def main():
                 completed_tasks.append((task, perturbation_set, success_percent))
                 print(f"Completed: {task} + {perturbation_set} -> {success_percent:.2f}% success")
             else:
-                # Explicit subprocess failure (non-zero return code / timeout) — record and continue.
+                # Evaluation failure — record it and continue with the next combination.
                 save_result_row(
                     csv_path=args.results_csv,
                     checkpoint_path=args.policy_path,
