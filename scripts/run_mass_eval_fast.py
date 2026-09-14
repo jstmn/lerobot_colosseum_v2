@@ -6,6 +6,7 @@ This script runs evaluation across all tasks and perturbation sets in one proces
 - One-time policy and policy-processor initialization
 - A fresh environment for every task+perturbation combination
 - Checkpoint resumption (skips already completed task+perturbation combinations)
+- Top-up: if a completed row has fewer episodes than --n_episodes, runs the remainder
 - Immediate CSV saving after each evaluation
 - Error handling with failure summary at the end
 
@@ -177,14 +178,44 @@ def get_or_create_results_csv(csv_path: str) -> pd.DataFrame:
         return df
 
 
-def check_if_completed(df: pd.DataFrame, task: str, perturbation_set: str) -> bool:
-    """Check if a task+perturbation_set combination has already been evaluated."""
-    result_found = df[
-        (df["env_id"] == task) &
-        (df["perturbation_set"].str.upper() == perturbation_set.upper()) &
-        (df["message"].isin(COMPLETED_MESSAGES))
+def _completed_rows(df: pd.DataFrame, task: str, perturbation_set: str) -> pd.DataFrame:
+    return df[
+        (df["env_id"] == task)
+        & (df["perturbation_set"].str.upper() == perturbation_set.upper())
+        & (df["message"].isin(COMPLETED_MESSAGES))
     ]
-    return len(result_found) > 0
+
+
+def get_existing_eval_progress(
+    df: pd.DataFrame, task: str, perturbation_set: str
+) -> tuple[int, int]:
+    """Return (num_eval_episodes, num_successful) from the best results_df row.
+
+    Picks the results_df row with the largest num_eval_episodes. Returns (0, 0)
+    when there is no results_df row yet.
+    """
+    matches = _completed_rows(df, task, perturbation_set)
+    results = matches[matches["message"] == "results_df"]
+    if len(results) == 0:
+        return 0, 0
+    idx = results["num_eval_episodes"].astype(float).idxmax()
+    row = results.loc[idx]
+    n_eval = int(float(row["num_eval_episodes"]))
+    n_success = int(float(row["num_sucessful_episodes"]))
+    return n_eval, max(n_success, 0)
+
+
+def check_if_completed(
+    df: pd.DataFrame, task: str, perturbation_set: str, target_n_episodes: int
+) -> bool:
+    """True if this pair is done for target_n_episodes (or variation is disabled)."""
+    matches = _completed_rows(df, task, perturbation_set)
+    if len(matches) == 0:
+        return False
+    if (matches["message"] == "variation_factor_disabled").any():
+        return True
+    existing_episodes, _ = get_existing_eval_progress(df, task, perturbation_set)
+    return existing_episodes >= target_n_episodes
 
 
 def _is_perturbation_factor_disabled(output: str) -> bool:
@@ -440,12 +471,14 @@ def run_lerobot_eval(
     batch_size: int,
     n_episodes: int,
     output_dir: str,
+    start_seed: int = 1000,
 ) -> tuple[bool, int, int, str]:
     """Evaluate one fresh environment using the already-loaded policy."""
     eval_output_dir = Path(output_dir) / f"{task}_{perturbation_set}"
     print(f"\n{'='*60}")
     print(f"Running: {task} with perturbation_set={perturbation_set}")
     print(f"Creating {batch_size} fresh environment(s)")
+    print(f"Episodes this run: {n_episodes} (start_seed={start_seed})")
     print(f"{'='*60}\n")
 
     envs = None
@@ -479,7 +512,7 @@ def run_lerobot_eval(
                 n_episodes=n_episodes,
                 max_episodes_rendered=0,
                 return_episode_data=False,
-                start_seed=1000,
+                start_seed=start_seed,
                 max_parallel_tasks=env_cfg.max_parallel_tasks,
             )
 
@@ -640,12 +673,12 @@ def main():
     skipped_tasks = []
     completed_tasks = []
 
-    # Remaining = task+perturbation combos still needing a run (excludes already-completed CSV rows).
+    # Remaining = task+perturbation combos still needing a run (excludes done / topped-up).
     remaining = sum(
         1
         for task in tasks
         for perturbation_set in perturbation_sets
-        if not check_if_completed(results_df, task, perturbation_set)
+        if not check_if_completed(results_df, task, perturbation_set, args.n_episodes)
     )
     task_durations: list[float] = []
     print(f"Remaining evaluations to run: {remaining}")
@@ -657,7 +690,7 @@ def main():
             (task, perturbation_set)
             for task in tasks
             for perturbation_set in perturbation_sets
-            if not check_if_completed(results_df, task, perturbation_set)
+            if not check_if_completed(results_df, task, perturbation_set, args.n_episodes)
         )
         first_episode_length = MAX_EPISODE_STEPS_BY_TASK[first_task]
         first_env_cfg = make_maniskill_config(
@@ -698,13 +731,29 @@ def main():
         for perturbation_set in perturbation_sets:
             eval_count += 1
 
-            # Check if already completed
-            if check_if_completed(results_df, task, perturbation_set):
+            # Check if already completed at/above target episode count
+            if check_if_completed(results_df, task, perturbation_set, args.n_episodes):
                 print(f"[{eval_count}/{total_evals}] Skipping {task} + {perturbation_set} (already completed)")
                 skipped_tasks.append((task, perturbation_set))
                 continue
 
-            print(f"\n[{eval_count}/{total_evals}] Starting: {task} + {perturbation_set}")
+            existing_episodes, existing_successes = get_existing_eval_progress(
+                results_df, task, perturbation_set
+            )
+            episodes_this_run = args.n_episodes - existing_episodes
+            assert episodes_this_run > 0, (
+                f"Expected remaining episodes > 0 for {task} + {perturbation_set}, "
+                f"got existing={existing_episodes}, target={args.n_episodes}"
+            )
+            start_seed = 1000 + existing_episodes
+
+            if existing_episodes > 0:
+                print(
+                    f"\n[{eval_count}/{total_evals}] Topping up: {task} + {perturbation_set} "
+                    f"({existing_episodes} -> {args.n_episodes}, running {episodes_this_run} more)"
+                )
+            else:
+                print(f"\n[{eval_count}/{total_evals}] Starting: {task} + {perturbation_set}")
             if task_durations:
                 avg_sec = sum(task_durations) / len(task_durations)
                 eta_hours = remaining * avg_sec / 3600.0
@@ -763,8 +812,9 @@ def main():
                 task=task,
                 perturbation_set=perturbation_set,
                 batch_size=eval_batch_size,
-                n_episodes=args.n_episodes,
+                n_episodes=episodes_this_run,
                 output_dir=str(output_dir),
+                start_seed=start_seed,
             )
             t_final = get_now_str()
             duration_sec = time.time() - t0
@@ -793,7 +843,9 @@ def main():
                 print(f"Soft-skipped: {task} + {perturbation_set} (perturbation factor disabled)")
             elif success:
                 assert n_total > 0, f"n_total must be > 0, got {n_total}"
-                success_percent = 100.0 * n_successful / n_total
+                combined_successful = existing_successes + n_successful
+                combined_total = existing_episodes + n_total
+                success_percent = 100.0 * combined_successful / combined_total
                 save_result_row(
                     csv_path=args.results_csv,
                     checkpoint_path=args.policy_path,
@@ -805,14 +857,21 @@ def main():
                     perturbation_set=perturbation_set,
                     control_mode=control_mode,
                     include_depth=args.include_depth,
-                    n_episodes=args.n_episodes,
+                    n_episodes=combined_total,
                     episode_length=task_episode_length,
                     message=message,
-                    num_successful=n_successful,
+                    num_successful=combined_successful,
                     success_percent=success_percent,
                 )
                 completed_tasks.append((task, perturbation_set, success_percent))
-                print(f"Completed: {task} + {perturbation_set} -> {success_percent:.2f}% success")
+                if existing_episodes > 0:
+                    print(
+                        f"Completed top-up: {task} + {perturbation_set} -> "
+                        f"{combined_successful}/{combined_total} ({success_percent:.2f}%) "
+                        f"[prior {existing_successes}/{existing_episodes} + new {n_successful}/{n_total}]"
+                    )
+                else:
+                    print(f"Completed: {task} + {perturbation_set} -> {success_percent:.2f}% success")
             else:
                 # Evaluation failure — record it and continue with the next combination.
                 save_result_row(

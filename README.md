@@ -221,7 +221,7 @@ python scripts/run_mass_eval_fast.py \
   --task_type bimanual \
   --validate_config \
   --batch_size 25 \
-  --n_episodes 50 \
+  --n_episodes 100 \
   --output_dir outputs/mass_eval_bimanual_molmoact2
 ```
 
