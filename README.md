@@ -132,7 +132,7 @@ For other policy architectures, users need to train their own models.
 
 Run evaluation on a single task:
 
-### Single-Arm Task
+**Single-Arm Task:**
 
 Default environment:
 ```bash
@@ -161,7 +161,7 @@ lerobot-eval \
 ```
 
 
-### Bimanual Task
+**Bimanual Task:**
 ```bash
 lerobot-eval \
   --policy.path=TODO:TRAIN A MODEL \
@@ -189,7 +189,14 @@ lerobot-eval \
 
 ## Full ColosseumV2 Evaluation
 
-Evaluate on all Colosseum V2 tasks and perturbation sets combinations using the `run_mass_eval.py` script.
+Evaluate on all Colosseum V2 tasks and perturbation sets combinations using the `run_mass_eval_fast.py` script.
+
+Set `POLICY` to `molmoact2` or `pi05` (Hub org is `jstm` for MolmoAct2, `pythonsong` for π0.5):
+
+```bash
+export POLICY=molmoact2  # or: pi05
+if [ "$POLICY" = "pi05" ]; then ORG=pythonsong; else ORG=jstm; fi
+```
 
 | Parameter | Description |
 |-----------|-------------|
@@ -198,31 +205,49 @@ Evaluate on all Colosseum V2 tasks and perturbation sets combinations using the 
 | `--batch_size` | Number of parallel environments |
 | `--n_episodes` | Episodes per task |
 | `--output_dir` | Output directory for results |
+| `--generate-episode-videos` | Directory for website episode videos (forces `batch_size=1`, `human_render_shader=rt`; writes `video_outcomes.csv`) |
 
 
-### Single-Arm
+**Single-Arm:**
 ```bash
 # export CUDA_VISIBLE_DEVICES=0
 python scripts/run_mass_eval_fast.py \
-  --policy_path jstm/molmoact2_single_arm \
+  --policy_path ${ORG}/${POLICY}_single_arm \
   --task_type single_arm \
-  --batch_size 25 \
-  --n_episodes 50 \
-  --output_dir outputs/mass_eval_single_arm_molmoact2 \
+  --batch_size 15 \
+  --n_episodes 200 \
+  --output_dir outputs/mass_eval_single_arm_${POLICY} \
   --validate_config
 
+# Website episode videos (batch_size forced to 1, human_render_shader=rt)
+python scripts/run_mass_eval_fast.py \
+  --policy_path ${ORG}/${POLICY}_single_arm \
+  --task_type single_arm \
+  --batch_size 1 \
+  --n_episodes 10 \
+  --output_dir outputs/mass_eval_single_arm_${POLICY}_videos \
+  --generate-episode-videos outputs/website_videos/${POLICY}_single_arm
 ```
 
-### Bimanual
+**Bimanual:**
 ```bash
 # export CUDA_VISIBLE_DEVICES=1
 python scripts/run_mass_eval_fast.py \
-  --policy_path jstm/molmoact2_bimanual \
+  --policy_path ${ORG}/${POLICY}_bimanual \
   --task_type bimanual \
   --validate_config \
   --batch_size 25 \
-  --n_episodes 100 \
-  --output_dir outputs/mass_eval_bimanual_molmoact2
+  --n_episodes 200 \
+  --output_dir outputs/mass_eval_bimanual_${POLICY}
+
+# Website episode videos (batch_size forced to 1, human_render_shader=rt)
+python scripts/run_mass_eval_fast.py \
+  --policy_path ${ORG}/${POLICY}_bimanual \
+  --task_type bimanual \
+  --batch_size 1 \
+  --n_episodes 10 \
+  --output_dir outputs/mass_eval_bimanual_${POLICY}_videos \
+  --generate-episode-videos outputs/website_videos/${POLICY}_bimanual
 ```
 
 
@@ -234,7 +259,7 @@ python scripts/run_mass_eval_fast.py \
 
 Train your own policy model on Colosseum V2 datasets:
 
-### Single-Arm
+**Single-Arm:**
 ```bash
 
 # Pi0.5
@@ -285,7 +310,7 @@ lerobot-train \
   --save_freq=1000
 ```
 
-### Bimanual
+**Bimanual:**
 ```bash
 lerobot-train \
   --dataset.repo_id=pythonsong/colosseum-bimanual-jan27 \
