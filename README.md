@@ -105,7 +105,7 @@ Colosseum V2 supports various perturbations for robustness testing:
 
 Run evaluation on a single task using `lerobot-eval`:
 
-### Single-Arm Task
+**Single-Arm Task**
 ```bash
 lerobot-eval \
   --policy.path=pythonsong/pi05_single_arm \
@@ -119,7 +119,7 @@ lerobot-eval \
   --output_dir=outputs_eval
 ```
 
-### Bimanual Task
+**Bimanual Task**
 ```bash
 lerobot-eval \
   --policy.path=pythonsong/pi05_bimanual \
@@ -133,7 +133,7 @@ lerobot-eval \
   --output_dir=/path/to/outputs
 ```
 
-### With Distraction Set
+**With Distraction Set**
 ```bash
 lerobot-eval \
   --policy.path=pythonsong/pi05_single_arm \
@@ -164,29 +164,52 @@ For Pi0.5 models, we provide pre-trained checkpoints that can be directly loaded
 
 For other policy architectures, users need to train their own models.
 
-### Single-Arm Evaluation
+**Single-Arm Evaluation**
 ```bash
 python scripts/run_mass_eval_fast.py \
   --policy_path pythonsong/pi05_single_arm \
   --task_type single_arm \
-  --batch_size 50 \
-  --n_episodes 50 \
+  --batch_size 15 \
+  --n_episodes 200 \
   --validate_config \
   --output_dir outputs/mass_eval_single_arm_pi05
+
+# Save videos
+python scripts/run_mass_eval_fast.py \
+  --policy_path pythonsong/pi05_single_arm \
+  --task_type single_arm \
+  --batch_size 1 \
+  --n_episodes 10 \
+  --output_dir outputs/mass_eval_single_arm_pi05_videos \
+  --generate-episode-videos outputs/episode_videos/pi05_single_arm
 ```
 
-### Bimanual Evaluation
+**Bimanual Evaluation**
 ```bash
 python scripts/run_mass_eval_fast.py \
   --policy_path pythonsong/pi05_bimanual \
   --task_type bimanual \
-  --batch_size 50 \
-  --n_episodes 50 \
+  --batch_size 15 \
+  --n_episodes 200 \
   --validate_config \
   --output_dir outputs/mass_eval_bimanual_pi05
+
+# Save videos
+python scripts/run_mass_eval_fast.py \
+  --policy_path pythonsong/pi05_bimanual \
+  --task_type bimanual \
+  --batch_size 1 \
+  --n_episodes 10 \
+  --output_dir outputs/mass_eval_bimanual_pi05_videos \
+  --generate-episode-videos outputs/episode_videos/pi05_bimanual
 ```
 
-### Mass Evaluation Parameters
+Website episode videos (batch size is forced to 1, render shader is ray-traced):
+
+```bash
+```
+
+**Mass Evaluation Parameters**
 
 | Parameter | Description |
 |-----------|-------------|
@@ -196,12 +219,13 @@ python scripts/run_mass_eval_fast.py \
 | `--n_episodes` | Episodes per task |
 | `--use_per_task_episode_length` | Use optimal episode length from training data |
 | `--output_dir` | Output directory for results |
+| `--generate-episode-videos` | Directory for website episode videos (forces `batch_size=1`, `human_render_shader=rt`; writes `video_outcomes.csv`) |
 
 ## Training
 
 Train your own policy model on Colosseum V2 datasets:
 
-### Single-Arm Training
+**Single-Arm Training**
 ```bash
 python src/lerobot/scripts/lerobot_train.py \
   --dataset.repo_id=pythonsong/colosseum-single-arm-jan27 \
@@ -222,7 +246,7 @@ python src/lerobot/scripts/lerobot_train.py \
   --save_freq=1000000000
 ```
 
-### Bimanual Training
+**Bimanual Training**
 ```bash
 python src/lerobot/scripts/lerobot_train.py \
   --dataset.repo_id=pythonsong/colosseum-bimanual-jan27 \

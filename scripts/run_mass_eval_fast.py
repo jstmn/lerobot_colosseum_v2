@@ -26,6 +26,7 @@ Usage:
 """
 
 import argparse
+import csv
 import json
 import os
 import socket
@@ -132,6 +133,15 @@ _CSV_COLUMNS_WITHOUT_TIMING = [
     "num_sucessful_episodes",
     "success_percent",
 ]
+
+# Matches ColosseumV2 movie_gen / eval_rgbd.py video_outcomes.csv
+VIDEO_OUTCOMES_CSV_COLUMNS = (
+    "filepath",
+    "env_id",
+    "perturbation_set",
+    "episode_idx",
+    "outcome",
+)
 
 
 # ============================================================================
@@ -269,11 +279,61 @@ def save_result_row(
     print(f"Saved results to {csv_path}")
 
 
+def append_video_outcomes_csv(
+    video_dir: Path,
+    task: str,
+    perturbation_set: str,
+    successes: list[bool],
+    video_paths: list[str],
+    episode_idx_offset: int = 0,
+) -> Path:
+    """Append one row per episode: renamed video path ↔ success/fail.
+
+    Renames lerobot's ``eval_episode_{i}.mp4`` to the movie_gen naming scheme
+    ``{env_id}___ds:{perturbation_set}__{episode_idx}.mp4``.
+    """
+    video_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = video_dir / "video_outcomes.csv"
+    write_header = not csv_path.exists() or csv_path.stat().st_size == 0
+
+    if len(successes) != len(video_paths):
+        raise ValueError(
+            f"successes ({len(successes)}) and video_paths ({len(video_paths)}) length mismatch "
+            f"for {task} + {perturbation_set}"
+        )
+
+    video_filename = f"{task}___ds:{perturbation_set}"
+    with csv_path.open("a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=VIDEO_OUTCOMES_CSV_COLUMNS)
+        if write_header:
+            writer.writeheader()
+        for local_idx, (ok, src_path) in enumerate(zip(successes, video_paths, strict=True)):
+            episode_idx = episode_idx_offset + local_idx
+            stem = f"{video_filename}__{episode_idx}".replace(" ", "_").replace("\n", "_")
+            dst_path = video_dir / f"{stem}.mp4"
+            src = Path(src_path)
+            if src.exists():
+                src.replace(dst_path)
+            filepath = str(dst_path.resolve())
+            writer.writerow(
+                {
+                    "filepath": filepath,
+                    "env_id": task,
+                    "perturbation_set": perturbation_set,
+                    "episode_idx": episode_idx,
+                    "outcome": "success" if bool(ok) else "fail",
+                }
+            )
+    print(f"Video outcomes appended to: {csv_path}")
+    return csv_path
+
+
 def make_maniskill_config(
     task: str,
     perturbation_set: str,
     episode_length: int,
     control_mode: str,
+    human_render_shader: str = "default",
 ) -> ManiSkillEnv:
     """Build the configuration used to create one evaluation environment."""
     return ManiSkillEnv(
@@ -281,6 +341,7 @@ def make_maniskill_config(
         episode_length=episode_length,
         control_mode=control_mode,
         perturbation_set=perturbation_set,
+        human_render_shader=human_render_shader,
     )
 
 
@@ -339,6 +400,7 @@ def validate_against_subprocess_config(
         "--eval.max_episodes_rendered=0",
         "--trust_remote_code=true",
         f"--env.perturbation_set={perturbation_set}",
+        f"--env.human_render_shader={fast_env_cfg.human_render_shader}",
         f"--output_dir={output_dir}",
     ]
     policy_path_lower = policy_path.lower()
@@ -440,12 +502,20 @@ def run_lerobot_eval(
     batch_size: int,
     n_episodes: int,
     output_dir: str,
-) -> tuple[bool, int, int, str]:
-    """Evaluate one fresh environment using the already-loaded policy."""
+    videos_dir: Path | None = None,
+    max_episodes_rendered: int = 0,
+) -> tuple[bool, int, int, str, list[bool], list[str]]:
+    """Evaluate one fresh environment using the already-loaded policy.
+
+    Returns:
+        (success, n_successful, n_total, message, episode_successes, video_paths)
+    """
     eval_output_dir = Path(output_dir) / f"{task}_{perturbation_set}"
     print(f"\n{'='*60}")
     print(f"Running: {task} with perturbation_set={perturbation_set}")
     print(f"Creating {batch_size} fresh environment(s)")
+    if max_episodes_rendered > 0:
+        print(f"Recording videos to: {videos_dir} (shader={env_cfg.human_render_shader})")
     print(f"{'='*60}\n")
 
     envs = None
@@ -465,6 +535,13 @@ def run_lerobot_eval(
             policy_cfg=policy_cfg,
         )
 
+        task_videos_dir = None
+        if max_episodes_rendered > 0:
+            if videos_dir is None:
+                raise ValueError("videos_dir is required when max_episodes_rendered > 0")
+            task_videos_dir = Path(videos_dir) / f"{task}_{perturbation_set}"
+            task_videos_dir.mkdir(parents=True, exist_ok=True)
+
         autocast_context = (
             torch.autocast(device_type=device.type) if policy_cfg.use_amp else nullcontext()
         )
@@ -477,7 +554,8 @@ def run_lerobot_eval(
                 preprocessor=preprocessor,
                 postprocessor=postprocessor,
                 n_episodes=n_episodes,
-                max_episodes_rendered=0,
+                max_episodes_rendered=max_episodes_rendered,
+                videos_dir=task_videos_dir,
                 return_episode_data=False,
                 start_seed=1000,
                 max_parallel_tasks=env_cfg.max_parallel_tasks,
@@ -490,7 +568,16 @@ def run_lerobot_eval(
         pc_success = eval_info["overall"]["pc_success"]
         n_successful = int(round(pc_success / 100.0 * n_episodes))
         print(f"Results from eval_info.json: pc_success={pc_success:.2f}%, n_successful={n_successful}/{n_episodes}")
-        return True, n_successful, n_episodes, "results_df"
+
+        episode_successes: list[bool] = list(eval_info["overall"].get("successes", []))
+        if not episode_successes:
+            for task_info in eval_info.get("per_task", []):
+                episode_successes.extend(task_info.get("metrics", {}).get("successes", []))
+        video_paths: list[str] = list(eval_info["overall"].get("video_paths", []))
+        if not video_paths:
+            for task_info in eval_info.get("per_task", []):
+                video_paths.extend(task_info.get("metrics", {}).get("video_paths", []))
+        return True, n_successful, n_episodes, "results_df", episode_successes, video_paths
     except KeyboardInterrupt:
         raise
     except Exception as exc:
@@ -498,8 +585,8 @@ def run_lerobot_eval(
         print(error_output, flush=True)
         if _is_perturbation_factor_disabled(error_output):
             print(f"Soft-skipping {task} + {perturbation_set}: perturbation factor disabled by env")
-            return False, -1, n_episodes, "variation_factor_disabled"
-        return False, 0, n_episodes, f"{type(exc).__name__}: {exc}"
+            return False, -1, n_episodes, "variation_factor_disabled", [], []
+        return False, 0, n_episodes, f"{type(exc).__name__}: {exc}", [], []
     finally:
         if envs is not None:
             close_envs(envs)
@@ -573,12 +660,38 @@ def main():
         action="store_true",
         help="One-time check that effective policy/env configs match run_mass_eval.py",
     )
+    parser.add_argument(
+        "--generate-episode-videos",
+        type=str,
+        default=None,
+        metavar="VIDEO_DIR",
+        help=(
+            "Save per-episode website videos under VIDEO_DIR (forces batch_size=1, "
+            "human_render_shader=rt) and write VIDEO_DIR/video_outcomes.csv with "
+            "filepath ↔ success/fail, matching movie_gen_loop.sh."
+        ),
+    )
     args = parser.parse_args()
     init_logging()
     register_third_party_plugins()
     torch.backends.cudnn.benchmark = True
     torch.backends.cuda.matmul.allow_tf32 = True
     set_seed(1000)
+
+    generate_episode_videos = args.generate_episode_videos is not None
+    video_dir: Path | None = None
+    human_render_shader = "default"
+    if generate_episode_videos:
+        video_dir = Path(args.generate_episode_videos)
+        video_dir.mkdir(parents=True, exist_ok=True)
+        if args.batch_size != 1:
+            print(
+                f"WARNING: --generate-episode-videos requires batch_size=1; "
+                f"overriding --batch_size={args.batch_size} -> 1"
+            )
+            args.batch_size = 1
+        human_render_shader = "rt"
+        print(f"Episode video capture enabled -> {video_dir} (human_render_shader=rt)")
 
     # Set up paths
     output_dir = Path(args.output_dir)
@@ -665,6 +778,7 @@ def main():
             perturbation_set=first_perturbation_set,
             episode_length=first_episode_length,
             control_mode=control_mode,
+            human_render_shader=human_render_shader,
         )
 
         policy_cfg, policy, preprocessor, postprocessor, device = load_policy_once(
@@ -752,8 +866,9 @@ def main():
                 perturbation_set=perturbation_set,
                 episode_length=task_episode_length,
                 control_mode=control_mode,
+                human_render_shader=human_render_shader,
             )
-            success, n_successful, n_total, message = run_lerobot_eval(
+            success, n_successful, n_total, message, episode_successes, video_paths = run_lerobot_eval(
                 policy_cfg=policy_cfg,
                 policy=policy,
                 preprocessor=preprocessor,
@@ -765,11 +880,28 @@ def main():
                 batch_size=eval_batch_size,
                 n_episodes=args.n_episodes,
                 output_dir=str(output_dir),
+                videos_dir=video_dir,
+                max_episodes_rendered=args.n_episodes if generate_episode_videos else 0,
             )
             t_final = get_now_str()
             duration_sec = time.time() - t0
             task_durations.append(duration_sec)
             remaining -= 1
+
+            if (
+                generate_episode_videos
+                and success
+                and message == "results_df"
+                and video_dir is not None
+                and video_paths
+            ):
+                append_video_outcomes_csv(
+                    video_dir=video_dir,
+                    task=task,
+                    perturbation_set=perturbation_set,
+                    successes=episode_successes,
+                    video_paths=video_paths,
+                )
 
             if message == "variation_factor_disabled":
                 save_result_row(
@@ -858,6 +990,9 @@ def main():
             print(f"  - {task} + {perturbation_set}: {error}")
 
     print(f"\nResults saved to: {args.results_csv}")
+    if generate_episode_videos and video_dir is not None:
+        print(f"Episode videos saved under: {video_dir}")
+        print(f"Video outcomes CSV: {video_dir / 'video_outcomes.csv'}")
 
 
 if __name__ == "__main__":

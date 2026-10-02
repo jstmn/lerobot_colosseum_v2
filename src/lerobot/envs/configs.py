@@ -484,6 +484,9 @@ class ManiSkillEnv(EnvConfig):
     sim_backend: str = "auto"
     camera_name: str = "base_camera"
     enable_cameras: bool = True
+    # Shader for the human/render camera used by env.render() video capture.
+    # "default" is fast; "rt" is ray-traced (photo-realistic, slower).
+    human_render_shader: str = "default"
     state_dim: int | None = None  # Auto-detect based on task (9 for single arm, 18 for bimanual)
     action_dim: int | None = None  # Auto-detect based on task (7 for single arm, 16 for bimanual)
     observation_height: int = 480  # Camera image height (must match training data)

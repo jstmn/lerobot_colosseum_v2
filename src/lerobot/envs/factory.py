@@ -228,6 +228,7 @@ def make_env(
             observation_height=cfg.observation_height,
             observation_width=cfg.observation_width,
             perturbation_set=cfg.perturbation_set,
+            human_render_shader=cfg.human_render_shader,
             env_cls=env_cls,
         )
 

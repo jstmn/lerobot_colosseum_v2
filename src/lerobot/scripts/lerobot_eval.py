@@ -796,6 +796,7 @@ def eval_policy_all(
             "avg_max_reward": _agg_from_list(acc["max_rewards"]),
             "pc_success": _agg_from_list(acc["successes"]) * 100 if acc["successes"] else float("nan"),
             "n_episodes": len(acc["sum_rewards"]),
+            "successes": list(acc["successes"]),
             "video_paths": list(acc["video_paths"]),
         }
 
@@ -807,6 +808,7 @@ def eval_policy_all(
         "n_episodes": len(overall["sum_rewards"]),
         "eval_s": time.time() - start_t,
         "eval_ep_s": (time.time() - start_t) / max(1, len(overall["sum_rewards"])),
+        "successes": list(overall["successes"]),
         "video_paths": list(overall["video_paths"]),
     }
 

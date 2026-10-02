@@ -246,6 +246,19 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
             return list(self._current_task_descriptions)
         elif method_name == "_max_episode_steps":
             return [self._max_episode_steps_val] * self.num_envs
+        elif method_name == "render":
+            # ManiSkill render returns a batched (B, H, W, C) array. LeRobot's
+            # eval path does np.stack(env.call("render")), so return one (H, W, C)
+            # frame per env — not a nested batch.
+            frame = self.render()
+            if frame is None:
+                return [None] * self.num_envs
+            arr = np.asarray(frame)
+            if arr.ndim == 3:
+                return [arr] if self.num_envs == 1 else [arr] * self.num_envs
+            if arr.ndim == 4:
+                return [arr[i] for i in range(self.num_envs)]
+            raise ValueError(f"Unexpected ManiSkill render shape: {arr.shape}")
         elif hasattr(self.unwrapped, 'call'):
             return self.unwrapped.call(method_name, *args, **kwargs)
         else:
@@ -377,6 +390,7 @@ def create_maniskill_envs(
     observation_height: int = 480,
     observation_width: int = 640,
     perturbation_set: str = "NONE",
+    human_render_shader: str = "default",
     env_cls=None,
 ) -> Dict[str, Dict[int, gym.vector.VectorEnv]]:
     """
@@ -394,6 +408,8 @@ def create_maniskill_envs(
         state_dim: State dimension (qpos dimensions to use)
         observation_height: Camera image height (must match training data)
         observation_width: Camera image width (must match training data)
+        human_render_shader: Shader pack for env.render() video frames
+            ("default", "rt", "rt-fast", ...)
         env_cls: Not used, kept for API compatibility
 
     Returns:
@@ -431,7 +447,9 @@ def create_maniskill_envs(
         "human_render_camera_configs": {
             "width": observation_width,
             "height": observation_height,
+            "shader_pack": human_render_shader,
         },
+        "human_render_shader": human_render_shader,
         "reward_mode": "sparse",
         "num_envs": n_envs,
         "max_episode_steps": episode_length,
