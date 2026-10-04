@@ -81,6 +81,27 @@ def get_cli_overrides(field_name: str, args: Sequence[str] | None = None) -> lis
     return attr_level_args
 
 
+def remap_generate_episode_videos_cli(args: Sequence[str]) -> list[str]:
+    """Accept --generate-episode-videos as an alias for --generate_episode_videos."""
+    remapped: list[str] = []
+    skip_next = False
+    for i, arg in enumerate(args):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--generate-episode-videos":
+            if i + 1 >= len(args):
+                raise ValueError("--generate-episode-videos requires a directory path")
+            remapped.append(f"--generate_episode_videos={args[i + 1]}")
+            skip_next = True
+            continue
+        if arg.startswith("--generate-episode-videos="):
+            remapped.append("--generate_episode_videos=" + arg.split("=", 1)[1])
+            continue
+        remapped.append(arg)
+    return remapped
+
+
 def parse_arg(arg_name: str, args: Sequence[str] | None = None) -> str | None:
     if args is None:
         args = sys.argv[1:]
@@ -290,7 +311,7 @@ def wrap(config_path: Path | None = None) -> Callable[[F], F]:
                 cfg = args[0]
                 args = args[1:]
             else:
-                cli_args = sys.argv[1:]
+                cli_args = remap_generate_episode_videos_cli(sys.argv[1:])
                 plugin_args = parse_plugin_args(PLUGIN_DISCOVERY_SUFFIX, cli_args)
                 for plugin_cli_arg, plugin_path in plugin_args.items():
                     try:

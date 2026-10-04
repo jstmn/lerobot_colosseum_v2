@@ -755,6 +755,11 @@ class ManiSkillEnv(EnvConfig):
                                    # RO_COLOR, RO_TEXTURE, RO_SIZE, TABLE_COLOR, TABLE_TEXTURE,
                                    # CAMERA_POSE, LIGHT_COLOR, BACKGROUND_TEXTURE, BACKGROUND_COLOR,
                                    # DISTRACTOR_OBJECT
+    # Policy gripper [closed_cmd, open_cmd] for MPC panda_wristcam2 only. Mapped onto
+    # finger meters [-0.02, 0.04]. None = raw meters. DROID / pi05_base is [1, 0].
+    normalized_gripper_range: tuple[float, float] | None = None
+    # PickCube-v2-wrist cube z success threshold in meters. Required for that task.
+    goal_height: float | None = None
 
     def _is_bimanual_task(self) -> bool:
         """Check if the task is a bimanual (dual-arm) task."""
@@ -785,9 +790,21 @@ class ManiSkillEnv(EnvConfig):
         self.features[OBS_STATE] = PolicyFeature(type=FeatureType.STATE, shape=(self.state_dim,))
         self.features_map[OBS_STATE] = OBS_STATE
 
+        task_name = self.task.split("::")[0].strip() if "::" in self.task else self.task.strip()
+        from lerobot.envs.maniskill import is_mpc_task, parse_goal_height, parse_normalized_gripper_range
+
+        self.normalized_gripper_range = parse_normalized_gripper_range(self.normalized_gripper_range)
+        if self.normalized_gripper_range is not None and not is_mpc_task(task_name):
+            raise ValueError(
+                f"normalized_gripper_range is only valid for MPC tasks, got {task_name!r}"
+            )
+        self.goal_height = parse_goal_height(self.goal_height, task_name)
+
         # Set camera features matching training data
         if self.enable_cameras:
-            if is_bimanual:
+            if is_mpc_task(task_name):
+                cam_keys = ["camera_center", "camera_left", "camera_wrist"]
+            elif is_bimanual:
                 cam_keys = ["external1_camera", "external2_camera", "panda1_hand_camera", "panda2_hand_camera"]
             else:
                 cam_keys = ["external1_camera", "external2_camera", "hand_camera"]
@@ -827,6 +844,8 @@ class ManiSkillEnv(EnvConfig):
             observation_width=self.observation_width,
             perturbation_set=self.perturbation_set,
             human_render_shader=self.human_render_shader,
+            normalized_gripper_range=self.normalized_gripper_range,
+            goal_height=self.goal_height,
             env_cls=_make_vec_env_cls(use_async_envs, n_envs),
         )
 

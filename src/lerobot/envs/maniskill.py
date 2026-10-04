@@ -75,6 +75,87 @@ BIMANUAL_TASK_MAPPING = {
 # Combined mapping for convenience
 ALL_TASK_MAPPING = {**SINGLE_ARM_TASK_MAPPING, **BIMANUAL_TASK_MAPPING}
 
+# MPC tabletop envs from ColosseumV2/mani_skill/envs/mpcm
+MPC_TASKS = {
+    "PickCube-v2-wrist",
+    "PushCube-v2",
+    "LiftPegUpright-v2",
+    "PullCubeTool-v2",
+}
+MPC_CAMERA_NAMES = [
+    ("camera_center", "camera_center"),
+    ("camera_left", "camera_left"),
+    ("camera_wrist", "camera_wrist"),
+]
+
+
+def is_mpc_task(env_id: str) -> bool:
+    return env_id in MPC_TASKS
+
+
+def is_pick_cube_task(env_id: str) -> bool:
+    return env_id == "PickCube-v2-wrist"
+
+
+def parse_goal_height(value: Any, env_id: str) -> float | None:
+    """PickCube lift success height in meters. Required for PickCube; forbidden otherwise."""
+    if is_pick_cube_task(env_id):
+        if value is None:
+            raise ValueError(
+                f"goal_height is required for {env_id} (cube z success threshold in meters, e.g. 0.1)"
+            )
+        goal_height = float(value)
+        if not goal_height > 0.02:
+            raise ValueError(f"goal_height={goal_height}, expected float > cube half-height 0.02")
+        return goal_height
+    if value is not None:
+        raise ValueError(f"goal_height is only valid for PickCube-v2-wrist, got env_id={env_id!r}")
+    return None
+
+
+# panda_wristcam2 gripper targets (meters). Open=0.04; -0.02 is the extra-close trick.
+PANDA_WRISTCAM2_GRIPPER_CLOSED_M = -0.02
+PANDA_WRISTCAM2_GRIPPER_OPEN_M = 0.04
+
+
+def parse_normalized_gripper_range(value: Any) -> tuple[float, float] | None:
+    """Parse ``[closed_cmd, open_cmd]``. ``None`` leaves the gripper in meters."""
+    if value is None:
+        return None
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        raise ValueError(
+            f"normalized_gripper_range must be two floats [closed_cmd, open_cmd], got {value!r}"
+        )
+    closed_cmd = float(value[0])
+    open_cmd = float(value[1])
+    if closed_cmd == open_cmd:
+        raise ValueError(f"normalized_gripper_range closed and open commands must differ, got {value!r}")
+    return (closed_cmd, open_cmd)
+
+
+def map_normalized_gripper_to_meters(
+    values: np.ndarray, closed_cmd: float, open_cmd: float
+) -> np.ndarray:
+    """Map policy gripper commands onto panda_wristcam2 finger width."""
+    lo = min(closed_cmd, open_cmd)
+    hi = max(closed_cmd, open_cmd)
+    t = (np.clip(values, lo, hi) - closed_cmd) / (open_cmd - closed_cmd)
+    return (
+        PANDA_WRISTCAM2_GRIPPER_CLOSED_M
+        + t * (PANDA_WRISTCAM2_GRIPPER_OPEN_M - PANDA_WRISTCAM2_GRIPPER_CLOSED_M)
+    ).astype(np.float32)
+
+
+def map_meters_to_normalized_gripper(
+    values: np.ndarray, closed_cmd: float, open_cmd: float
+) -> np.ndarray:
+    """Map panda_wristcam2 finger width back onto the policy gripper range."""
+    t = (values - PANDA_WRISTCAM2_GRIPPER_CLOSED_M) / (
+        PANDA_WRISTCAM2_GRIPPER_OPEN_M - PANDA_WRISTCAM2_GRIPPER_CLOSED_M
+    )
+    return (closed_cmd + t * (open_cmd - closed_cmd)).astype(np.float32)
+
+
 # Tasks that support perturbation_set parameter (true Colosseum v2 tasks)
 # These are tasks defined in mani_skill/envs/tasks/tabletop/colosseum_v2/
 # Some tasks like StackCube-v1, LiftPegUpright-v1, PegInsertionSide-v1, PlugCharger-v1
@@ -152,10 +233,16 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         output_camera_name: str = None,
         state_dim: int = 9,
         camera_names: list = None,
+        normalized_gripper_range: tuple[float, float] | None = None,
     ):
         super().__init__(env)
         self._task = task
         self._task_description = task_description
+        self._normalized_gripper_range = parse_normalized_gripper_range(normalized_gripper_range)
+        if self._normalized_gripper_range is not None and not is_mpc_task(task):
+            raise ValueError(
+                f"normalized_gripper_range is only valid for MPC tasks {sorted(MPC_TASKS)}, got {task!r}"
+            )
         # Needed for check_env_attributes_and_types()
         self.task = task
         self.task_description = task_description
@@ -252,6 +339,13 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
 
     def step(self, action):
         """Step and convert observation."""
+        if self._normalized_gripper_range is not None:
+            action = np.asarray(action, dtype=np.float32)
+            if action.ndim < 1 or action.shape[-1] < 1:
+                raise ValueError(f"action must include a gripper dim, got shape {action.shape}")
+            action = action.copy()
+            closed_cmd, open_cmd = self._normalized_gripper_range
+            action[..., -1] = map_normalized_gripper_to_meters(action[..., -1], closed_cmd, open_cmd)
         obs, reward, terminated, truncated, info = self.env.step(action)
 
         # Convert reward to numpy if needed
@@ -329,6 +423,14 @@ class ManiSkillVectorEnvWrapper(gym.Wrapper):
         if hasattr(qpos, 'cpu'):
             qpos = qpos.cpu().numpy()
         agent_pos = qpos[..., :self._state_dim].astype(np.float32)
+        if self._normalized_gripper_range is not None:
+            if agent_pos.shape[-1] < 8:
+                raise ValueError(
+                    f"normalized_gripper_range requires qpos dim >= 8 (7 arm + fingers), got {agent_pos.shape}"
+                )
+            agent_pos = agent_pos.copy()
+            closed_cmd, open_cmd = self._normalized_gripper_range
+            agent_pos[..., 7:] = map_meters_to_normalized_gripper(agent_pos[..., 7:], closed_cmd, open_cmd)
 
         # Read all configured cameras
         pixels = {}
@@ -360,6 +462,8 @@ def create_maniskill_envs(
     observation_width: int = 640,
     perturbation_set: str = "NONE",
     human_render_shader: str = "default",
+    normalized_gripper_range: tuple[float, float] | None = None,
+    goal_height: float | None = None,
     env_cls=None,
 ) -> Dict[str, Dict[int, gym.vector.VectorEnv]]:
     """
@@ -379,6 +483,9 @@ def create_maniskill_envs(
         observation_width: Camera image width (must match training data)
         human_render_shader: Shader pack for env.render() video frames
             ("default", "rt", "rt-fast", ...)
+        normalized_gripper_range: Policy gripper [closed_cmd, open_cmd] mapped onto
+            panda_wristcam2 finger meters. None leaves the gripper in meters.
+        goal_height: PickCube-v2-wrist cube z success threshold in meters.
         env_cls: Not used, kept for API compatibility
 
     Returns:
@@ -405,6 +512,8 @@ def create_maniskill_envs(
         else:
             print(f"  Found task in mapping: [{task_index}] \"{task_description}\"")
 
+    parsed_goal_height = parse_goal_height(goal_height, task_name)
+
     # Create the ManiSkill environment with custom camera resolution
     # Use global sensor_configs to apply to ALL cameras (not camera-specific)
     env_kwargs = {
@@ -428,6 +537,8 @@ def create_maniskill_envs(
             "height": observation_height,
         },
     }
+    if parsed_goal_height is not None:
+        env_kwargs["goal_height"] = parsed_goal_height
 
     # Camera configuration: list of (env_cam_name, output_cam_name) tuples
     # Single arm Colosseum v2: 3 cameras matching training data
@@ -449,7 +560,16 @@ def create_maniskill_envs(
         env_kwargs["_env_id"] = task_name
         print(f"  Adding perturbation_set={ds_key} for Colosseum v2 task")
 
-    if not is_bimanual_task(task_name):
+    gripper_range = parse_normalized_gripper_range(normalized_gripper_range)
+    if gripper_range is not None and not is_mpc_task(task_name):
+        raise ValueError(
+            f"normalized_gripper_range is only valid for MPC tasks {sorted(MPC_TASKS)}, got {task_name!r}"
+        )
+
+    if is_mpc_task(task_name):
+        task_camera_names = list(MPC_CAMERA_NAMES)
+        print(f"  MPC cameras: {[c[0] for c in task_camera_names]}")
+    elif not is_bimanual_task(task_name):
         # Single arm: use all 3 cameras that match training data
         task_camera_names = [
             ("external1_camera", "external1_camera"),
@@ -493,6 +613,8 @@ def create_maniskill_envs(
     print(f"  camera_resolution: {observation_width}x{observation_height}")
     print(f"  cameras: {task_camera_names}")
     print(f"  state_dim: {actual_state_dim}")
+    print(f"  normalized_gripper_range: {gripper_range}")
+    print(f"  goal_height: {parsed_goal_height}")
     print(f"  task_description: {task_description}")
     print(f"  env_kwargs: {env_kwargs}")
     import sys
@@ -518,6 +640,7 @@ def create_maniskill_envs(
         max_episode_steps=episode_length,
         state_dim=actual_state_dim,
         camera_names=task_camera_names,
+        normalized_gripper_range=gripper_range,
     )
     print("[Step 4/4] ManiSkillVectorEnvWrapper created successfully.")
     sys.stdout.flush()

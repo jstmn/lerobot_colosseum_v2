@@ -50,6 +50,7 @@ You can learn about the CLI options for this script in the `EvalPipelineConfig` 
 """
 
 import concurrent.futures as cf
+import csv
 import json
 import logging
 import threading
@@ -782,7 +783,16 @@ def eval_main(cfg: EvalPipelineConfig):
 
     recording_dir = Path(cfg.output_dir) / "recordings" if cfg.eval.recording else None
     max_episodes_rendered = cfg.eval.max_episodes_rendered
-    videos_dir = Path(cfg.output_dir) / "videos" if max_episodes_rendered > 0 else None
+    if cfg.generate_episode_videos:
+        videos_dir = Path(cfg.generate_episode_videos)
+        videos_dir.mkdir(parents=True, exist_ok=True)
+        max_episodes_rendered = cfg.eval.n_episodes
+        logging.info(
+            colored("Episode video capture:", "yellow", attrs=["bold"])
+            + f" {videos_dir} (human_render_shader={getattr(cfg.env, 'human_render_shader', None)})"
+        )
+    else:
+        videos_dir = Path(cfg.output_dir) / "videos" if max_episodes_rendered > 0 else None
 
     with torch.no_grad(), torch.autocast(device_type=device.type) if cfg.policy.use_amp else nullcontext():
         info = eval_policy_all(
@@ -819,7 +829,58 @@ def eval_main(cfg: EvalPipelineConfig):
     with open(output_dir / "eval_info.json", "w") as f:
         json.dump(info, f, indent=2)
 
+    if cfg.generate_episode_videos and videos_dir is not None:
+        task_name = cfg.env.task.split("::", 1)[0].strip() if getattr(cfg.env, "task", None) else "unknown"
+        perturbation_set = getattr(cfg.env, "perturbation_set", "NONE")
+        write_video_outcomes_csv(
+            video_dir=videos_dir,
+            env_id=task_name,
+            perturbation_set=perturbation_set,
+            successes=info["overall"].get("successes", []),
+            video_paths=info["overall"].get("video_paths", []),
+        )
+
     logging.info("End of eval")
+
+
+def write_video_outcomes_csv(
+    video_dir: Path,
+    env_id: str,
+    perturbation_set: str,
+    successes: list[bool],
+    video_paths: list[str],
+) -> Path:
+    """Write one row per episode: renamed video path ↔ success/fail."""
+    video_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = video_dir / "video_outcomes.csv"
+    if len(successes) != len(video_paths):
+        raise ValueError(
+            f"successes ({len(successes)}) and video_paths ({len(video_paths)}) length mismatch "
+            f"for {env_id} + {perturbation_set}"
+        )
+    video_filename = f"{env_id}___ds:{perturbation_set}"
+    with csv_path.open("w", newline="") as f:
+        writer = csv.DictWriter(
+            f, fieldnames=("filepath", "env_id", "perturbation_set", "episode_idx", "outcome")
+        )
+        writer.writeheader()
+        for episode_idx, (ok, src_path) in enumerate(zip(successes, video_paths, strict=True)):
+            stem = f"{video_filename}__{episode_idx}".replace(" ", "_").replace("\n", "_")
+            dst_path = video_dir / f"{stem}.mp4"
+            src = Path(src_path)
+            if src.exists():
+                src.replace(dst_path)
+            writer.writerow(
+                {
+                    "filepath": str(dst_path.resolve()),
+                    "env_id": env_id,
+                    "perturbation_set": perturbation_set,
+                    "episode_idx": episode_idx,
+                    "outcome": "success" if bool(ok) else "fail",
+                }
+            )
+    logging.info("Video outcomes written to: %s", csv_path)
+    return csv_path
 
 
 # ---- typed payload returned by one task eval ----

@@ -41,6 +41,9 @@ class EvalPipelineConfig:
     rename_map: dict[str, str] = field(default_factory=dict)
     # Explicit consent to execute remote code from the Hub (required for hub environments).
     trust_remote_code: bool = False
+    # Directory for per-episode videos. Forces eval.batch_size=1, eval.max_episodes_rendered=n_episodes,
+    # and env.human_render_shader="rt" when that field exists. CLI alias: --generate-episode-videos.
+    generate_episode_videos: str | None = None
 
     def __post_init__(self) -> None:
         # HACK: We parse again the cli args here to get the pretrained path if there was one.
@@ -72,6 +75,17 @@ class EvalPipelineConfig:
             now = dt.datetime.now()
             eval_dir = f"{now:%Y-%m-%d}/{now:%H-%M-%S}_{self.job_name}"
             self.output_dir = Path("outputs/eval") / eval_dir
+
+        if self.generate_episode_videos:
+            if self.eval.batch_size != 1:
+                logger.warning(
+                    "--generate-episode-videos requires batch_size=1; "
+                    f"overriding --eval.batch_size={self.eval.batch_size} -> 1"
+                )
+                self.eval.batch_size = 1
+            self.eval.max_episodes_rendered = self.eval.n_episodes
+            if hasattr(self.env, "human_render_shader"):
+                self.env.human_render_shader = "rt"
 
     @classmethod
     def __get_path_fields__(cls) -> list[str]:

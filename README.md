@@ -1,19 +1,6 @@
-<p align="center">
-  <img alt="Colosseum V2 Tasks and Perturbations" src="https://jstmn.github.io/colosseum-v2-website/content/ColosseumV2_hero.jpg" width="100%">
-</p>
+![Colosseum V2 Tasks and Perturbations](https://jstmn.github.io/colosseum-v2-website/content/ColosseumV2_hero.jpg)
 
-<div align="center">
 
-# LeRobot Colosseum V2
-
-**The First Native ManiSkill Support for LeRobot**
-
-[![Python versions](https://img.shields.io/pypi/pyversions/lerobot)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/huggingface/lerobot/blob/main/LICENSE)
-
-[Paper](https://jstmn.github.io/colosseum-v2-website/) | [ManiSkill](https://github.com/haosulab/ManiSkill) | [LeRobot](https://github.com/huggingface/lerobot)
-
-</div>
 
 ## Overview
 
@@ -27,9 +14,14 @@ This repository provides the **first native ManiSkill simulator implementation**
 - Automatic per-task episode length based on training data statistics
 - Mass evaluation script with checkpoint resumption and real-time CSV logging
 
+
+
 ## Supported Tasks
 
+
+
 ### Single-Arm Tasks (16)
+
 - RaiseCube
 - PickSodaFromCabinet
 - PickDishFromRack
@@ -47,7 +39,10 @@ This repository provides the **first native ManiSkill simulator implementation**
 - PlaceCubeInDrawer
 - CookItemInPan
 
+
+
 ### Bimanual Tasks (12)
+
 - DualArmPickCube
 - DualArmPickBottle
 - DualArmLiftPot
@@ -60,6 +55,8 @@ This repository provides the **first native ManiSkill simulator implementation**
 - DualArmDrawerOpen
 - DualArmStackCube
 - DualArmStack3Cube
+
+
 
 ## Installation
 
@@ -92,24 +89,29 @@ pip install -e ColosseumV2
 export MS_SKIP_ASSET_DOWNLOAD_PROMPT=1; python -m ColosseumV2.mani_skill.utils.download_asset ycb; python -m ColosseumV2.mani_skill.utils.download_asset RoboCasa; python -m ColosseumV2.mani_skill.utils.download_asset partnet_mobility
 ```
 
-This will install ManiSkill with the required Colosseum V2 tasks and environments. 
+This will install ManiSkill with the required Colosseum V2 tasks and environments.
 
 ## Perturbation Sets
 
 Colosseum V2 supports various perturbations for robustness testing:
 
-| Category | Sets |
-|----------|------|
-| Object | `MO_COLOR`, `MO_TEXTURE`, `MO_SIZE`, `MO_MASS` |
-| Robot | `RO_COLOR`, `RO_TEXTURE`, `RO_SIZE` |
-| Table | `TABLE_COLOR`, `TABLE_TEXTURE` |
+
+| Category    | Sets                                                                   |
+| ----------- | ---------------------------------------------------------------------- |
+| Object      | `MO_COLOR`, `MO_TEXTURE`, `MO_SIZE`, `MO_MASS`                         |
+| Robot       | `RO_COLOR`, `RO_TEXTURE`, `RO_SIZE`                                    |
+| Table       | `TABLE_COLOR`, `TABLE_TEXTURE`                                         |
 | Environment | `CAMERA_POSE`, `LIGHT_COLOR`, `BACKGROUND_TEXTURE`, `BACKGROUND_COLOR` |
-| Distractor | `DISTRACTOR_OBJECT` |
-| Combined | `ALL`, `NONE` |
+| Distractor  | `DISTRACTOR_OBJECT`                                                    |
+| Combined    | `ALL`, `NONE`                                                          |
+
+
+
 
 # Evaluation
 
 The following examples demonstrate evaluation using the **MolmoAct2** model. Our framework also supports other policy architectures including:
+
 - **X-VLA**
 - **Pi0**
 - **Pi0.5**
@@ -123,10 +125,11 @@ The following examples demonstrate evaluation using the **MolmoAct2** model. Our
 Any policy model compatible with the LeRobot framework can be evaluated on this benchmark. Note that the Pi0.5 model trained for the ColosseumV2 paper is not usable in this repository as there were several changes to the Pi0.5 model code base made during the lerobot v0.4.3 -> 0.6.0 update. To run the model from the paper, checkout the [lerobot_0.4.3](https://github.com/jstmn/lerobot_colosseum_v2/tree/lerobot_0.4.3) branch at [jstmn/lerobot_colosseum_v2](https://github.com/jstmn/lerobot_colosseum_v2) and follow the instructions in README.md.
 
 For MolmoAct2 models, we provide pre-trained checkpoints that can be directly loaded from HuggingFace:
+
 - Single-Arm: `jstm/molmoact2_single_arm`
 - Bimanual: `jstm/molmoact2_bimanual`
 
-For other policy architectures, users need to train their own models. 
+For other policy architectures, users need to train their own models.
 
 ## Single Task Evaluation
 
@@ -135,6 +138,7 @@ Run evaluation on a single task:
 **Single-Arm Task:**
 
 Default environment:
+
 ```bash
 lerobot-eval \
   --policy.path=jstm/molmoact2_single_arm \
@@ -149,6 +153,7 @@ lerobot-eval \
 ```
 
 **With a perturbation set (e.g. MO_COLOR)**:
+
 ```bash
 lerobot-eval \
   --policy.path=pythonsong/pi05_single_arm \
@@ -160,8 +165,8 @@ lerobot-eval \
   --output_dir=/path/to/outputs
 ```
 
-
 **Bimanual Task:**
+
 ```bash
 lerobot-eval \
   --policy.path=TODO:TRAIN A MODEL \
@@ -176,6 +181,7 @@ lerobot-eval \
 ```
 
 **With a perturbation set (e.g. MO_COLOR)**:
+
 ```bash
 lerobot-eval \
   --policy.path=TODO:TRAIN A MODEL \
@@ -186,6 +192,8 @@ lerobot-eval \
   --eval.batch_size=100 \
   --output_dir=/path/to/outputs
 ```
+
+
 
 ## Full ColosseumV2 Evaluation
 
@@ -198,17 +206,19 @@ export POLICY=molmoact2  # or: pi05
 if [ "$POLICY" = "pi05" ]; then ORG=pythonsong; else ORG=jstm; fi
 ```
 
-| Parameter | Description |
-|-----------|-------------|
-| `--policy_path` | HuggingFace model path |
-| `--task_type` | `single_arm` or `bimanual` |
-| `--batch_size` | Number of parallel environments |
-| `--n_episodes` | Episodes per task |
-| `--output_dir` | Output directory for results |
-| `--generate-episode-videos` | Directory for website episode videos (forces `batch_size=1`, `human_render_shader=rt`; writes `video_outcomes.csv`) |
+
+| Parameter                   | Description                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `--policy_path`             | HuggingFace model path                                                                                             |
+| `--task_type`               | `single_arm` or `bimanual`                                                                                         |
+| `--batch_size`              | Number of parallel environments                                                                                    |
+| `--n_episodes`              | Episodes per task                                                                                                  |
+| `--output_dir`              | Output directory for results                                                                                       |
+| `--generate-episode-videos` | Directory for website episode videos (forces`batch_size=1`, `human_render_shader=rt`; writes `video_outcomes.csv`) |
 
 
 **Single-Arm:**
+
 ```bash
 # export CUDA_VISIBLE_DEVICES=0
 python scripts/run_mass_eval_fast.py \
@@ -230,6 +240,7 @@ python scripts/run_mass_eval_fast.py \
 ```
 
 **Bimanual:**
+
 ```bash
 # export CUDA_VISIBLE_DEVICES=1
 python scripts/run_mass_eval_fast.py \
@@ -252,14 +263,12 @@ python scripts/run_mass_eval_fast.py \
 
 
 
-
-
-
 ## Training
 
 Train your own policy model on Colosseum V2 datasets:
 
 **Single-Arm:**
+
 ```bash
 
 # Pi0.5
@@ -311,6 +320,7 @@ lerobot-train \
 ```
 
 **Bimanual:**
+
 ```bash
 lerobot-train \
   --dataset.repo_id=pythonsong/colosseum-bimanual-jan27 \
@@ -359,23 +369,31 @@ lerobot-train \
   --save_freq=1000
 ```
 
+
+
 ## Results
 
 Results are saved to a CSV file with columns:
 
-| Column | Description |
-|--------|-------------|
-| `env_id` | Task name |
-| `perturbation_set` | Perturbation type |
-| `num_eval_episodes` | Total episodes |
+
+| Column                   | Description         |
+| ------------------------ | ------------------- |
+| `env_id`                 | Task name           |
+| `perturbation_set`       | Perturbation type   |
+| `num_eval_episodes`      | Total episodes      |
 | `num_sucessful_episodes` | Successful episodes |
-| `success_percent` | Success rate (%) |
+| `success_percent`        | Success rate (%)    |
+
+
+
 
 ## Acknowledgments
 
 - [LeRobot](https://github.com/huggingface/lerobot) - Hugging Face Robotics Library
 - [ManiSkill](https://github.com/haosulab/ManiSkill) - GPU-parallelized robotics simulator
 - [Colosseum V2](https://jstmn.github.io/colosseum-v2-website/) - Robotic manipulation benchmark
+
+
 
 ## Citation
 
@@ -393,6 +411,117 @@ If you use this work, please cite:
 }
 ```
 
+
+
 ## License
 
 Apache 2.0 License
+
+## MPC tabletop envs with pi0.5 base
+
+The envs from `mpcm/envs` are registered by `ColosseumV2/mani_skill/envs/mpcm` when ManiSkill is imported:
+
+
+| Env ID              | Episode length | Task language                                                                    |
+| ------------------- | -------------- | -------------------------------------------------------------------------------- |
+| `PickCube-v2-wrist` | 100            | lift the red cube                                                                |
+| `PushCube-v2`       | 80             | push the cube to the goal                                                        |
+| `LiftPegUpright-v2` | 225            | lift the peg upright                                                             |
+| `PullCubeTool-v2`   | 350            | grasp the red L-shaped hook and use it to pull the blue cube closer to the robot |
+
+
+`lerobot/pi05_base` reads `observation.images.base_0_rgb`, `observation.images.left_wrist_0_rgb`, and `observation.images.right_wrist_0_rgb`. `jstm/molmoact2_single_arm` reads `observation.images.external1_camera`, `observation.images.external2_camera`, and `observation.images.hand_camera`. The MPC envs expose their own cameras; remapped with `--rename_map`:
+
+**pi0.5**
+- `camera_center` → `base_0_rgb`
+- `camera_left` → `left_wrist_0_rgb`
+- `camera_wrist` → `right_wrist_0_rgb`
+
+**MolmoAct2**
+- `camera_center` → `external1_camera`
+- `camera_left` → `external2_camera`
+- `camera_wrist` → `hand_camera`
+
+
+
+The checkpoint's default device is `mps`. On this machine pass `--policy.device=cuda`. `lerobot/pi05_base` predicts 32-D padded actions; the Franka layout is 7 joint velocities plus gripper at index 7. Pass `--env.control_mode=pd_joint_vel --env.action_dim=8` so eval keeps those 8 dims instead of slicing the first 7 into `pd_ee_delta_pose`. `panda_wristcam2` gripper targets are meters in `[-0.02, 0.04]`. `--env.normalized_gripper_range=[closed_cmd,open_cmd]` maps the last action dim (and finger qpos in state) onto that. DROID / `pi05_base` is `[1,0]` (`1`=closed, `0`=open). `PickCube-v2-wrist` success is `cube.z > goal_height` (default env value is `0.2`). Pass `--env.goal_height=0.1` to match the 10 cm lift used in MPC eval. Pointcloud observations are not supported (`is_pointcloud=True` raises). `--generate-episode-videos DIR` forces `batch_size=1` and `human_render_shader=rt`, writes videos under `DIR`, and appends `DIR/video_outcomes.csv`.
+
+50-episode evals (`batch_size=2`) then 10 recorded episodes per task, for both policies: `scripts/eval_mpc_tabletop.sh`.
+
+```bash
+conda activate lerobot_cv2
+cd /home/jstm/Projects/lerobot_colosseum_v2
+pip install 'transformers>=5.4.0,<5.6.0'  # pi0.5 extra; skip if already installed
+
+# all cameras: camera_wrist, camera_left, camera_low_neg_y, camera_center, camera_right
+
+RENAME_MAP='{"observation.images.camera_center":"observation.images.base_0_rgb","observation.images.camera_left":"observation.images.left_wrist_0_rgb","observation.images.camera_wrist":"observation.images.right_wrist_0_rgb"}'
+
+# Repeat with the other rows of the table (task string and --env.episode_length).
+# Action: 8-D pd_joint_vel = 7 arm joint velocities, gripper at index 7.
+lerobot-eval \
+  --policy.path=lerobot/pi05_base \
+  --policy.pretrained_path=lerobot/pi05_base \
+  --policy.device=cuda \
+  --env.type=maniskill \
+  --env.control_mode=pd_joint_vel \
+  --env.action_dim=8 \
+  --env.normalized_gripper_range=[1,0] \
+  --env.goal_height=0.1 \
+  --env.task="PickCube-v2-wrist::lift the red cube" \
+  --env.episode_length=100 \
+  --env.observation_height=224 \
+  --env.observation_width=224 \
+  --eval.n_episodes=1 \
+  --eval.batch_size=1 \
+  --eval.max_episodes_rendered=0 \
+  --rename_map="$RENAME_MAP" \
+  --output_dir=outputs/pi05_base__PickCube-v2-wrist
+
+# Episode videos (forces batch_size=1, human_render_shader=rt; writes video_outcomes.csv)
+# Action: 8-D pd_joint_vel = 7 arm joint velocities, gripper at index 7.
+lerobot-eval \
+  --policy.path=lerobot/pi05_base \
+  --policy.pretrained_path=lerobot/pi05_base \
+  --policy.device=cuda \
+  --env.type=maniskill \
+  --env.control_mode=pd_joint_vel \
+  --env.action_dim=8 \
+  --env.normalized_gripper_range=[1,0] \
+  --env.goal_height=0.1 \
+  --env.episode_length=100 \
+  --env.observation_height=224 \
+  --env.observation_width=224 \
+  --env.task="PickCube-v2-wrist::lift the red cube" \
+  --eval.n_episodes=5 \
+  --eval.batch_size=1 \
+  --rename_map="$RENAME_MAP" \
+  --output_dir=outputs/pi05_base__PickCube-v2-wrist \
+  --generate-episode-videos outputs/pi05_base__PickCube-v2-wrist/videos
+
+# MolmoAct2 (single-arm Colosseum checkpoint; remap MPC cameras onto its Colosseum keys)
+MOLMO_RENAME_MAP='{"observation.images.camera_center":"observation.images.external1_camera","observation.images.camera_left":"observation.images.external2_camera","observation.images.camera_wrist":"observation.images.hand_camera"}'
+
+lerobot-eval \
+  --policy.path=jstm/molmoact2_single_arm \
+  --policy.inference_action_mode=continuous \
+  --policy.device=cuda \
+  --trust_remote_code=true \
+  --env.type=maniskill \
+  --env.episode_length=100 \
+  --env.observation_height=224 \
+  --env.observation_width=224 \
+  --eval.n_episodes=10 \
+  --eval.batch_size=1 \
+  --rename_map="$MOLMO_RENAME_MAP" \
+  --env.goal_height=0.1 \
+  --env.task="PickCube-v2-wrist::grasp and raise the red cube" \
+  --output_dir=outputs/molmoact2__PickCube-v2-wrist \
+  --generate-episode-videos outputs/molmoact2__PickCube-v2-wrist/videos
+
+
+# --env.task="PushCube-v2::push the cube to the goal region" \
+#   --output_dir=outputs/molmoact2__PushCube-v2 \
+#   --generate-episode-videos outputs/molmoact2__PushCube-v2/videos
+```
+
