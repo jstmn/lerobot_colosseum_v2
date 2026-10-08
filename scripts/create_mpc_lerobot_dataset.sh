@@ -8,6 +8,10 @@
 #   bash scripts/create_mpc_lerobot_dataset.sh -n 100
 #   bash scripts/create_mpc_lerobot_dataset.sh -n 5 --num-procs 2
 #   bash scripts/create_mpc_lerobot_dataset.sh --envs "PickCube-v2-wrist PushCube-v2"
+#   bash scripts/create_mpc_lerobot_dataset.sh --data-dir /media/volume/mpc_a/lerobot_data
+#
+# Demos and the LeRobot export go under --data-dir (default: $LEROBOT_DATA_DIR).
+# That directory must already exist.
 
 set -euo pipefail
 set +o histexpand
@@ -20,6 +24,7 @@ INCLUDED_CAMERAS="camera_center camera_left camera_wrist"
 ENVS_ARG=""
 N_TRAJ=100
 NUM_PROCS=""
+DATA_DIR=""
 LEROBOT_DIR=""
 IMAGE_SIZE="378x378"
 REPO_ID=""
@@ -43,6 +48,10 @@ while [[ $# -gt 0 ]]; do
             ENVS_ARG="$2"
             shift 2
             ;;
+        --data-dir)
+            DATA_DIR="$2"
+            shift 2
+            ;;
         --output-dir)
             LEROBOT_DIR="$2"
             shift 2
@@ -60,12 +69,14 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -h|--help)
-            echo "Usage: $0 [-n N] [--num-procs P] [--included-cameras CAMS] [--envs ENV_IDS] [--output-dir DIR] [--image-size WxH] [--repo-id ID] [--no-upload]"
+            echo "Usage: $0 [-n N] [--num-procs P] [--included-cameras CAMS] [--envs ENV_IDS] [--data-dir DIR] [--output-dir DIR] [--image-size WxH] [--repo-id ID] [--no-upload]"
             echo "  -n, --num-traj          Successful demos per env (default: 100)"
             echo "  --num-procs             Parallel workers (default: cpu_count/2). Must be < N."
             echo "  --included-cameras      Space-separated camera uids (default: camera_center camera_left camera_wrist)"
             echo "  --envs                  Space-separated env ids (default: the 4 MPC tabletop tasks)"
-            echo "  --output-dir            LeRobot dataset directory (default: outputs/mpc_lerobot_pd_ee_pose_<N>)"
+            echo "  --data-dir              Root for ManiSkill demos + default LeRobot export"
+            echo "                          (default: \$LEROBOT_DATA_DIR). Must already exist."
+            echo "  --output-dir            LeRobot dataset directory (default: <data-dir>/mpc_lerobot_pd_ee_pose_<N>)"
             echo "  --image-size            convert_to_lerobot image size (default: 378x378, MolmoAct2 input)"
             echo "  --repo-id               Hub dataset id (default: jstm/mpc_lerobot_pd_ee_pose_<N>)"
             echo "  --no-upload             Skip pushing the LeRobot dataset to the Hub"
@@ -88,8 +99,22 @@ if [ ! -d "${COLOSSEUM_DIR}" ]; then
     exit 1
 fi
 
+if [ -z "${DATA_DIR}" ]; then
+    DATA_DIR="${LEROBOT_DATA_DIR:-}"
+fi
+if [ -z "${DATA_DIR}" ]; then
+    echo "data dir required: pass --data-dir or set LEROBOT_DATA_DIR" >&2
+    exit 1
+fi
+if [ ! -d "${DATA_DIR}" ]; then
+    echo "data dir does not exist: ${DATA_DIR}" >&2
+    exit 1
+fi
+DATA_DIR="$(cd "${DATA_DIR}" && pwd)"
+DEMOS_DIR="${DATA_DIR}/demos"
+
 if [ -z "${LEROBOT_DIR}" ]; then
-    LEROBOT_DIR="${ROOT}/outputs/mpc_lerobot_pd_ee_pose_${N_TRAJ}"
+    LEROBOT_DIR="${DATA_DIR}/mpc_lerobot_pd_ee_pose_${N_TRAJ}"
 fi
 
 ENVS=(
@@ -131,8 +156,8 @@ cd "${COLOSSEUM_DIR}"
 
 for ENV_ID in "${ENVS[@]}"; do
 
-    TRAJ_PATH=demos/${ENV_ID}/motionplanning/trajectory__pd_joint_pos__${N_TRAJ}.h5
-    TRANSLATED_TRAJ_PATH=demos/${ENV_ID}/motionplanning/trajectory__pd_joint_pos__${N_TRAJ}.${OBS_MODE}.${TARGET_CONTROL_MODE}.physx_cpu.h5
+    TRAJ_PATH=${DEMOS_DIR}/${ENV_ID}/motionplanning/trajectory__pd_joint_pos__${N_TRAJ}.h5
+    TRANSLATED_TRAJ_PATH=${DEMOS_DIR}/${ENV_ID}/motionplanning/trajectory__pd_joint_pos__${N_TRAJ}.${OBS_MODE}.${TARGET_CONTROL_MODE}.physx_cpu.h5
 
     if [ -f "$TRANSLATED_TRAJ_PATH" ]; then
         echo -e "\033[1;32m Converted trajectory file $TRANSLATED_TRAJ_PATH already exists\033[0m"
@@ -161,6 +186,7 @@ for ENV_ID in "${ENVS[@]}"; do
             --reward-mode ${REWARD_MODE} \
             --random-seed \
             --only-count-success \
+            --record-dir "${DEMOS_DIR}" \
             --traj-name "trajectory__pd_joint_pos__${N_TRAJ}"
     else
         echo -e "\033[1;32mTrajectory file $TRAJ_PATH already exists\033[0m"
@@ -198,10 +224,10 @@ done
 # Combine per-env h5 files into one multitask trajectory.
 INPUT_DIRS=""
 for ENV in "${ENVS[@]}"; do
-    INPUT_DIRS="${INPUT_DIRS}demos/${ENV}/motionplanning "
+    INPUT_DIRS="${INPUT_DIRS}${DEMOS_DIR}/${ENV}/motionplanning "
 done
 INPUT_DIRS=$(echo "${INPUT_DIRS}" | xargs)
-OUTPUT_PATH=demos/trajectory__mpc__${TARGET_CONTROL_MODE}__${N_TRAJ}.h5
+OUTPUT_PATH=${DEMOS_DIR}/trajectory__mpc__${TARGET_CONTROL_MODE}__${N_TRAJ}.h5
 
 echo "Input directories: ${INPUT_DIRS}"
 echo ""
@@ -274,7 +300,7 @@ PY
 
 echo "----------------------------------------------------------------"
 echo "  ---  LEROBOT DATASET: ${LEROBOT_DIR} ---  "
-echo "Merged ManiSkill file: ${COLOSSEUM_DIR}/${OUTPUT_PATH}"
+echo "Merged ManiSkill file: ${OUTPUT_PATH}"
 echo "LeRobot dataset: ${LEROBOT_DIR}"
 
 if [ "${UPLOAD}" -eq 1 ]; then

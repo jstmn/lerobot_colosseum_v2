@@ -430,7 +430,9 @@ conda activate lerobot_cv2
 # N=100 per task (default). Writes local files, then uploads to
 #   https://huggingface.co/datasets/jstm/mpc_lerobot_pd_ee_pose_<N>
 # Cameras: camera_center, camera_left, camera_wrist (MolmoAct2 single-arm).
-bash scripts/create_mpc_lerobot_dataset.sh -n 100 \
+# Writes ManiSkill demos + LeRobot export under $LEROBOT_DATA_DIR
+# (must already exist; override with --data-dir).
+bash scripts/create_mpc_lerobot_dataset.sh -n 200 \
   --included-cameras "camera_center camera_left camera_wrist"
 
 # Smoke test (N must be greater than --num-procs)
@@ -438,7 +440,7 @@ bash scripts/create_mpc_lerobot_dataset.sh -n 6 --num-procs 2 \
   --included-cameras "camera_center camera_left camera_wrist"
 ```
 
-Optional flags: `--num-procs P`, `--envs "PickCube-v2-wrist PushCube-v2"`, `--output-dir DIR`, `--image-size 378x378`, `--repo-id USER/NAME`, `--no-upload`.
+Optional flags: `--num-procs P`, `--envs "PickCube-v2-wrist PushCube-v2"`, `--data-dir DIR`, `--output-dir DIR`, `--image-size 378x378`, `--repo-id USER/NAME`, `--no-upload`.
 
 Pipeline (same as `ColosseumV2/scripts/data_generation/motionplanning_colosseum_v2_single_arm.sh`, plus LeRobot export):
 
@@ -452,7 +454,7 @@ Then finetune:
 ```bash
 N=6
 DATASET_REPO_ID=jstm/mpc_lerobot_pd_ee_pose_${N}
-DATASET_ROOT=outputs/mpc_lerobot_pd_ee_pose_${N}
+DATASET_ROOT=${LEROBOT_DATA_DIR}/mpc_lerobot_pd_ee_pose_${N}
 
 lerobot-train \
   --dataset.repo_id=${DATASET_REPO_ID} \
@@ -467,7 +469,7 @@ lerobot-train \
   --policy.control_mode="absolute end-effector pose" \
   --policy.image_keys='["observation.images.camera_center","observation.images.camera_left","observation.images.camera_wrist"]' \
   --policy.device=cuda \
-  --output_dir=outputs/molmoact2_mpc__$(date +%Y-%m-%d--%H-%M-%S) \
+  --output_dir=${LEROBOT_DATA_DIR}/molmoact2_mpc__$(date +%Y-%m-%d--%H-%M-%S) \
   --job_name=molmoact2_mpc \
   --policy.repo_id=jstm/molmoact2_mpc \
   --policy.gradient_checkpointing=true \
