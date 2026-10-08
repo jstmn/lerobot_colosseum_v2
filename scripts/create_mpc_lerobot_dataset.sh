@@ -4,14 +4,12 @@
 #
 # Modeled on ColosseumV2/scripts/data_generation/motionplanning_colosseum_v2_single_arm.sh
 #
-#   bash scripts/create_mpc_lerobot_dataset.sh
-#   bash scripts/create_mpc_lerobot_dataset.sh -n 100
-#   bash scripts/create_mpc_lerobot_dataset.sh -n 5 --num-procs 2
-#   bash scripts/create_mpc_lerobot_dataset.sh --envs "PickCube-v2-wrist PushCube-v2"
 #   bash scripts/create_mpc_lerobot_dataset.sh --data-dir /media/volume/mpc_a/lerobot_data
+#   bash scripts/create_mpc_lerobot_dataset.sh --data-dir DIR -n 100
+#   bash scripts/create_mpc_lerobot_dataset.sh --data-dir DIR -n 5 --num-procs 2
+#   bash scripts/create_mpc_lerobot_dataset.sh --data-dir DIR --envs "PickCube-v2-wrist PushCube-v2"
 #
-# Demos and the LeRobot export go under --data-dir (default: $LEROBOT_DATA_DIR).
-# That directory must already exist.
+# Demos and the LeRobot export go under --data-dir (required; must already exist).
 
 set -euo pipefail
 set +o histexpand
@@ -69,13 +67,12 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -h|--help)
-            echo "Usage: $0 [-n N] [--num-procs P] [--included-cameras CAMS] [--envs ENV_IDS] [--data-dir DIR] [--output-dir DIR] [--image-size WxH] [--repo-id ID] [--no-upload]"
+            echo "Usage: $0 --data-dir DIR [-n N] [--num-procs P] [--included-cameras CAMS] [--envs ENV_IDS] [--output-dir DIR] [--image-size WxH] [--repo-id ID] [--no-upload]"
+            echo "  --data-dir              Root for ManiSkill demos + default LeRobot export (required; must already exist)"
             echo "  -n, --num-traj          Successful demos per env (default: 100)"
             echo "  --num-procs             Parallel workers (default: cpu_count/2). Must be < N."
             echo "  --included-cameras      Space-separated camera uids (default: camera_center camera_left camera_wrist)"
             echo "  --envs                  Space-separated env ids (default: the 4 MPC tabletop tasks)"
-            echo "  --data-dir              Root for ManiSkill demos + default LeRobot export"
-            echo "                          (default: \$LEROBOT_DATA_DIR). Must already exist."
             echo "  --output-dir            LeRobot dataset directory (default: <data-dir>/mpc_lerobot_pd_ee_pose_<N>)"
             echo "  --image-size            convert_to_lerobot image size (default: 378x378, MolmoAct2 input)"
             echo "  --repo-id               Hub dataset id (default: jstm/mpc_lerobot_pd_ee_pose_<N>)"
@@ -100,10 +97,7 @@ if [ ! -d "${COLOSSEUM_DIR}" ]; then
 fi
 
 if [ -z "${DATA_DIR}" ]; then
-    DATA_DIR="${LEROBOT_DATA_DIR:-}"
-fi
-if [ -z "${DATA_DIR}" ]; then
-    echo "data dir required: pass --data-dir or set LEROBOT_DATA_DIR" >&2
+    echo "--data-dir is required" >&2
     exit 1
 fi
 if [ ! -d "${DATA_DIR}" ]; then

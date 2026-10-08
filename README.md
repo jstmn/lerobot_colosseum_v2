@@ -430,17 +430,17 @@ conda activate lerobot_cv2
 # N=100 per task (default). Writes local files, then uploads to
 #   https://huggingface.co/datasets/jstm/mpc_lerobot_pd_ee_pose_<N>
 # Cameras: camera_center, camera_left, camera_wrist (MolmoAct2 single-arm).
-# Writes ManiSkill demos + LeRobot export under $LEROBOT_DATA_DIR
-# (must already exist; override with --data-dir).
-bash scripts/create_mpc_lerobot_dataset.sh -n 200 \
+# --data-dir is required (must already exist); ManiSkill demos + LeRobot
+# export go under it.
+bash scripts/create_mpc_lerobot_dataset.sh --data-dir "$LEROBOT_DATA_DIR" -n 50 \
   --included-cameras "camera_center camera_left camera_wrist"
 
 # Smoke test (N must be greater than --num-procs)
-bash scripts/create_mpc_lerobot_dataset.sh -n 6 --num-procs 2 \
+bash scripts/create_mpc_lerobot_dataset.sh --data-dir "$LEROBOT_DATA_DIR" -n 6 --num-procs 2 \
   --included-cameras "camera_center camera_left camera_wrist"
 ```
 
-Optional flags: `--num-procs P`, `--envs "PickCube-v2-wrist PushCube-v2"`, `--data-dir DIR`, `--output-dir DIR`, `--image-size 378x378`, `--repo-id USER/NAME`, `--no-upload`.
+Required: `--data-dir DIR`. Optional: `--num-procs P`, `--envs "PickCube-v2-wrist PushCube-v2"`, `--output-dir DIR`, `--image-size 378x378`, `--repo-id USER/NAME`, `--no-upload`.
 
 Pipeline (same as `ColosseumV2/scripts/data_generation/motionplanning_colosseum_v2_single_arm.sh`, plus LeRobot export):
 
