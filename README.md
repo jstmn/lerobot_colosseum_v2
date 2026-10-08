@@ -417,7 +417,75 @@ If you use this work, please cite:
 
 Apache 2.0 License
 
-## MPC tabletop envs with pi0.5 base
+
+# MPC Development
+
+### MolmoAct2 finetune dataset
+
+Collect N motion-planning demos from each MPC tabletop env, replay them to absolute EE pose (`pd_ee_pose`), merge, then convert to LeRobot. MolmoAct2's vision encoder is **378×378**, so the exporter letterboxes frames to a square 378×378.
+
+```bash
+conda activate lerobot_cv2
+
+# N=100 per task (default). Writes local files, then uploads to
+#   https://huggingface.co/datasets/jstm/mpc_lerobot_pd_ee_pose_<N>
+# Cameras: camera_center, camera_left, camera_wrist (MolmoAct2 single-arm).
+bash scripts/create_mpc_lerobot_dataset.sh -n 100 \
+  --included-cameras "camera_center camera_left camera_wrist"
+
+# Smoke test (N must be greater than --num-procs)
+bash scripts/create_mpc_lerobot_dataset.sh -n 6 --num-procs 2 \
+  --included-cameras "camera_center camera_left camera_wrist"
+```
+
+Optional flags: `--num-procs P`, `--envs "PickCube-v2-wrist PushCube-v2"`, `--output-dir DIR`, `--image-size 378x378`, `--repo-id USER/NAME`, `--no-upload`.
+
+Pipeline (same as `ColosseumV2/scripts/data_generation/motionplanning_colosseum_v2_single_arm.sh`, plus LeRobot export):
+
+1. `mani_skill/examples/motionplanning/panda/run.py` — collect `pd_joint_pos` successes
+2. `mani_skill/trajectory/replay_trajectory.py --target-control-mode pd_ee_pose`
+3. `mani_skill/trajectory/merge_multitask_trajectories.py`
+4. `mani_skill/trajectory/convert_to_lerobot.py` — square 378×378 videos + per-episode task language
+
+Then finetune:
+
+```bash
+N=6
+DATASET_REPO_ID=jstm/mpc_lerobot_pd_ee_pose_${N}
+DATASET_ROOT=outputs/mpc_lerobot_pd_ee_pose_${N}
+
+lerobot-train \
+  --dataset.repo_id=${DATASET_REPO_ID} \
+  --dataset.root=${DATASET_ROOT} \
+  --policy.type=molmoact2 \
+  --policy.checkpoint_path=allenai/MolmoAct2-LIBERO \
+  --policy.action_mode=continuous \
+  --policy.train_action_expert_only=true \
+  --policy.chunk_size=10 \
+  --policy.n_action_steps=10 \
+  --policy.setup_type="single franka robotic arm in maniskill" \
+  --policy.control_mode="absolute end-effector pose" \
+  --policy.image_keys='["observation.images.camera_center","observation.images.camera_left","observation.images.camera_wrist"]' \
+  --policy.device=cuda \
+  --output_dir=outputs/molmoact2_mpc__$(date +%Y-%m-%d--%H-%M-%S) \
+  --job_name=molmoact2_mpc \
+  --policy.repo_id=jstm/molmoact2_mpc \
+  --policy.gradient_checkpointing=true \
+  --wandb.enable=true \
+  --wandb.disable_artifact=true \
+  --steps=10000 \
+  --batch_size=32 \
+  --num_workers=32 \
+  --log_freq=20 \
+  --env_eval_freq=-1 \
+  --save_checkpoint=true \
+  --save_freq=1000
+```
+
+Use the three MPC cameras above (or remap to `external1_camera` / `external2_camera` / `hand_camera` at eval, same as below).
+
+
+### pi0.5
 
 The envs from `mpcm/envs` are registered by `ColosseumV2/mani_skill/envs/mpcm` when ManiSkill is imported:
 
