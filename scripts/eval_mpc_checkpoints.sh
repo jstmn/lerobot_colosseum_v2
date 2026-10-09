@@ -162,18 +162,18 @@ write_md() {
     echo "| step | $(printf '%s | ' "${TASKS[@]%%|*}" | sed 's/ | $//') | mean |"
     echo "| ---: | $(for _ in "${TASKS[@]}"; do printf ' ---: |'; done) ---: |"
 
-    for step in "${STEPS[@]}"; do
-      row="| ${step}"
+    for md_step in "${STEPS[@]}"; do
+      row="| ${md_step}"
       sum=0
       n=0
-      for spec in "${TASKS[@]}"; do
-        IFS='|' read -r env_id _ _ <<<"${spec}"
-        key="${step}|${env_id}"
+      for md_spec in "${TASKS[@]}"; do
+        IFS='|' read -r env_id _ _ <<<"${md_spec}"
+        key="${md_step}|${env_id}"
         val="${RESULTS[${key}]:-}"
-        if [[ -z "${val}" && -f "${EVAL_ROOT}/step_${step}/${env_id}/eval_info.json" ]]; then
+        if [[ -z "${val}" && -f "${EVAL_ROOT}/step_${md_step}/${env_id}/eval_info.json" ]]; then
           val="$(python3 -c "
 import json
-info = json.load(open('${EVAL_ROOT}/step_${step}/${env_id}/eval_info.json'))
+info = json.load(open('${EVAL_ROOT}/step_${md_step}/${env_id}/eval_info.json'))
 print(f\"{info['overall']['pc_success']:.1f}\")
 ")"
           RESULTS["${key}"]="${val}"
