@@ -164,8 +164,9 @@ wandb/
 
 # Data folders
 data/
-outputs/
-# Keep MPC checkpoint eval summaries trackable (parents must be un-ignored).
+# Ignore outputs, but keep checkpoint eval_info.json trackable.
+# Each parent directory must be un-ignored for git to see the files.
+outputs/*
 !outputs/train/
 outputs/train/*
 !outputs/train/*/
@@ -175,7 +176,7 @@ outputs/train/*/checkpoint_evals/*
 !outputs/train/*/checkpoint_evals/*/
 outputs/train/*/checkpoint_evals/*/*
 !outputs/train/*/checkpoint_evals/*/*/
-outputs/train/*/checkpoint_evals/*/*/*
+outputs/train/*/checkpoint_evals/*/*/**
 !outputs/train/*/checkpoint_evals/*/*/eval_info.json
 
 # Translations
