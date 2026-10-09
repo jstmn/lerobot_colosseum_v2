@@ -193,6 +193,7 @@ run_one() {
       --output_dir="${out_dir}"
     )
     if [[ "${row}" == "base" ]]; then
+      # LIBERO base norms use 8-D state (7 joints + 1 gripper); MPC default is 9.
       cmd+=(
         --policy.type=molmoact2
         --policy.checkpoint_path="${BASE_POLICY}"
@@ -200,6 +201,7 @@ run_one() {
         --policy.image_keys="${BASE_IMAGE_KEYS}"
         --policy.setup_type="${BASE_SETUP_TYPE}"
         --policy.control_mode="${BASE_CONTROL_MODE}"
+        --env.state_dim=8
       )
     else
       cmd+=(--policy.path="${CKPT_ROOT}/${row}/pretrained_model")
@@ -260,7 +262,8 @@ write_md() {
     echo "| ---: | $(for _ in "${TASKS[@]}"; do printf ' ---: |'; done) ---: |"
 
     for md_row in "${ROWS[@]}"; do
-      row="| ${md_row}"
+      # Use md_line (not row) so we don't clobber the caller's loop variable.
+      md_line="| ${md_row}"
       sum=0
       n=0
       for md_spec in "${TASKS[@]}"; do
@@ -283,14 +286,14 @@ print(f\"{info['overall']['pc_success']:.1f}\")
           n=$((n + 1))
           val="${val}%"
         fi
-        row+=" | ${val}"
+        md_line+=" | ${val}"
       done
       if [[ "${n}" -gt 0 ]]; then
         mean="$(python3 -c "print(f'{${sum}/${n}:.1f}%')")"
       else
         mean="—"
       fi
-      echo "${row} | ${mean} |"
+      echo "${md_line} | ${mean} |"
     done
   } > "${RESULTS_MD}"
   echo "Wrote ${RESULTS_MD}"

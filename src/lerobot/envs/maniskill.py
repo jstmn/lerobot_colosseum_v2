@@ -601,7 +601,8 @@ def create_maniskill_envs(
         env_kwargs["control_mode"] = actual_control_mode
         print(f"  Bimanual task detected: state_dim={actual_state_dim}, control_mode={actual_control_mode}")
     else:
-        actual_state_dim = 9
+        # Respect caller override (e.g. --env.state_dim=8 for LIBERO-normalized base policies).
+        actual_state_dim = state_dim
         actual_control_mode = control_mode  # Use the provided control_mode
         print(f"  Single arm task: state_dim={actual_state_dim}, control_mode={actual_control_mode}")
 
