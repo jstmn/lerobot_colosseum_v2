@@ -165,6 +165,18 @@ wandb/
 # Data folders
 data/
 outputs/
+# Keep MPC checkpoint eval summaries trackable (parents must be un-ignored).
+!outputs/train/
+outputs/train/*
+!outputs/train/*/
+outputs/train/*/*
+!outputs/train/*/checkpoint_evals/
+outputs/train/*/checkpoint_evals/*
+!outputs/train/*/checkpoint_evals/*/
+outputs/train/*/checkpoint_evals/*/*
+!outputs/train/*/checkpoint_evals/*/*/
+outputs/train/*/checkpoint_evals/*/*/*
+!outputs/train/*/checkpoint_evals/*/*/eval_info.json
 
 # Translations
 *.mo
